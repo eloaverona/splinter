@@ -64,7 +64,12 @@ use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Incoming,
     ListenError, Listener, Transport,
 };
-
+use splinter::biome::{
+    credentials,
+    rest_api::{BiomeRestResourceManager, BiomeRestConfigBuilder, BiomeRestResourceManagerBuilder},
+    users,
+};
+use splinter::database::{self, ConnectionPool};
 use crate::registry_config::{RegistryConfig, RegistryConfigBuilder, RegistryConfigError};
 use crate::routes;
 
@@ -357,6 +362,24 @@ impl SplinterDaemon {
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
 
+        let connection_pool: ConnectionPool = database::create_connection_pool(
+            "postgres://splinter_admin:splinter_test@0.0.0.0:5432/splinter",
+        )
+        .expect("err");
+
+        database::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
+        users::database::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
+        credentials::database::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
+
+        let biome_config = BiomeRestConfigBuilder::default().with_password_encryption_cost("low").build().expect("err");
+        let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
+        let biome_rest_provider = biome_rest_provider_builder
+            .with_user_store(connection_pool.clone())
+            .with_credentials_store(connection_pool.clone())
+            .with_rest_config(biome_config)
+            .build()
+            .expect("err");
+
         // Allowing unused_mut because rest_api_builder must be mutable if feature circuit-read is
         // enabled
         #[allow(unused_mut)]
@@ -374,6 +397,7 @@ impl SplinterDaemon {
             .add_resource(make_nodes_resource(node_registry.clone()))
             .add_resources(key_registry_manager.resources())
             .add_resources(admin_service.resources())
+            .add_resources(biome_rest_provider.resources())
             .add_resources(orchestrator_resources);
 
         #[cfg(feature = "circuit-read")]
