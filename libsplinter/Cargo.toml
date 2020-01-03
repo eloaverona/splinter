@@ -86,7 +86,7 @@ experimental = [
     "zmq-transport",
 ]
 
-biome = ["database", "jsonwebtoken", "rand"]
+biome = ["database", "jsonwebtoken", "rand", "rest-api"]
 biome-credentials = ["biome", "database", "bcrypt"]
 biome-key-management = ["biome", "database"]
 biome-notifications = ["biome", "database"]

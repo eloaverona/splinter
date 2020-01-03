@@ -16,6 +16,7 @@
 
 pub mod database;
 pub(in crate::biome) mod store;
+pub(in crate::biome) mod rest_resources;
 
 use database::postgres::models::KeyModel;
 
