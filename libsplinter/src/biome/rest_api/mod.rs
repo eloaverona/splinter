@@ -50,7 +50,7 @@ use crate::database::ConnectionPool;
 use crate::rest_api::{Resource, RestResourceProvider};
 
 #[cfg(feature = "biome-key-management")]
-use super::key_management::store::postgres::PostgresKeyStore;
+use super::key_management::{store::postgres::PostgresKeyStore, rest_resources::make_key_management_route};
 use super::secrets::{AutoSecretManager, SecretManager};
 use super::users::user_store::SplinterUserStore;
 
@@ -109,6 +109,13 @@ impl RestResourceProvider for BiomeRestResourceManager {
                 );
             }
         };
+        #[cfg(feature = "biome-key-management")]
+        resources.push(make_key_management_route(
+            // credentials_store.clone(),
+            // self.user_store.clone(),
+             self.rest_config.clone(),
+             self.token_secret_manager.clone()
+        ));
         resources
     }
 }

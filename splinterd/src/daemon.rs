@@ -68,6 +68,7 @@ use splinter::biome::{
     credentials,
     rest_api::{BiomeRestResourceManager, BiomeRestConfigBuilder, BiomeRestResourceManagerBuilder},
     users,
+    key_management
 };
 use splinter::database::{self, ConnectionPool};
 use crate::registry_config::{RegistryConfig, RegistryConfigBuilder, RegistryConfigError};
@@ -370,12 +371,15 @@ impl SplinterDaemon {
         database::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
         users::database::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
         credentials::database::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
+        key_management::database::postgres::run_migrations(&*connection_pool.get().expect("errr")).expect("err");
+
 
         let biome_config = BiomeRestConfigBuilder::default().with_password_encryption_cost("low").build().expect("err");
         let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
         let biome_rest_provider = biome_rest_provider_builder
             .with_user_store(connection_pool.clone())
             .with_credentials_store(connection_pool.clone())
+            .with_key_store(connection_pool.clone())
             .with_rest_config(biome_config)
             .build()
             .expect("err");
