@@ -48,12 +48,12 @@ impl KeyStore<Key> for PostgresKeyStore {
         Ok(())
     }
 
-    fn update_key(&self, updated_key: Key) -> Result<(), KeyStoreError> {
+    fn update_key(&self, public_key: &str, user_id: &str, new_display_name: &str) -> Result<(), KeyStoreError> {
         update_key(
             &*self.connection_pool.get()?,
-            &updated_key.user_id,
-            &updated_key.public_key,
-            &updated_key.display_name,
+            &user_id,
+            &public_key,
+            &new_display_name,
         )
         .map_err(|err| KeyStoreError::OperationError {
             context: "Failed to update key".to_string(),

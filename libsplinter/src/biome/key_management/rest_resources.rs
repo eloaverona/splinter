@@ -38,7 +38,7 @@ struct NewKey {
 #[derive(Deserialize)]
 struct UpdatedKey {
     public_key: String,
-    display_name: String
+    new_display_name: String
 }
 
 
@@ -192,7 +192,7 @@ pub fn make_key_management_route(
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
-            let new_key = match serde_json::from_slice::<UpdatedKey>(&bytes) {
+            let updated_key = match serde_json::from_slice::<UpdatedKey>(&bytes) {
                 Ok(val) => val,
                 Err(err) => {
                     debug!("Error parsing payload {}", err);
@@ -204,9 +204,8 @@ pub fn make_key_management_route(
                         .into_future();
                 }
             };
-            let key = Key::new(&new_key.public_key, &new_key.encrypted_private_key, &user_id, &new_key.display_name);
 
-            match key_store.update_key(key) {
+            match key_store.update_key(&updated_key.public_key, &user_id, &updated_key.new_display_name) {
                 Ok(()) => HttpResponse::Ok()
                     .json(json!({ "message": "Key updated successfully" }))
                     .into_future(),
