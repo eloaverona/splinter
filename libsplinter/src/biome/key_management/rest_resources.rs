@@ -105,7 +105,7 @@ pub fn make_key_management_route(
                 }
             }
         }))
-    }).add_method(Method::Get, move |request, payload| {
+    }).add_method(Method::Get, move |request, _| {
         let rest_config = rest_config.clone();
         let key_store = key_store.clone();
         // let token_issuer = token_issuer.clone();
@@ -135,7 +135,20 @@ pub fn make_key_management_route(
             debug!("Invalid token: {}", err);
             return  Box::new(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized("User is not authorized")).into_future())
         };
-        Box::new(HttpResponse::Ok().json(format!("auto {:?}", auth_token)).into_future())
+
+        match key_store.list_keys(Some(&user_id)) {
+            Ok(keys) =>  Box::new(HttpResponse::Ok()
+                .json(json!({ "data": keys }))
+                .into_future()),
+            Err(err) => {
+                debug!("Failed to fetch keys {}", err);
+                 Box::new(HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future())
+            }
+        }
+
+        //Box::new(HttpResponse::Ok().json(format!("auto {:?}", auth_token)).into_future())
     })
     //     Box::new(HttpResponse::Ok().json(format!("auto {:?}", auth_token)).into_future())
     // })

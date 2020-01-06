@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::database::postgres::helpers::insert_key;
+use super::super::database::postgres::helpers::{insert_key, list_keys, list_keys_with_user_id};
 use super::super::store::{KeyStore, KeyStoreError};
 use super::super::Key;
 use crate::database::ConnectionPool;
@@ -58,7 +58,21 @@ impl KeyStore<Key> for PostgresKeyStore {
         unimplemented!()
     }
 
-    fn list_keys(&self, _user_id: Option<&str>) -> Result<Vec<Key>, KeyStoreError> {
-        unimplemented!()
+    fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<Key>, KeyStoreError> {
+        let query_result = match user_id {
+            Some(user_id) => list_keys_with_user_id(&*self.connection_pool.get()?, user_id)
+                .map_err(|err| KeyStoreError::OperationError {
+                    context: "Failed to retrieve keys".to_string(),
+                    source: Box::new(err),
+                })?,
+            None => list_keys(&*self.connection_pool.get()?).map_err(|err| {
+                KeyStoreError::OperationError {
+                    context: "Failed to retrieve keys".to_string(),
+                    source: Box::new(err),
+                }
+            })?,
+        };
+        let keys = query_result.into_iter().map(|key| Key::from(key)).collect();
+        Ok(keys)
     }
 }
