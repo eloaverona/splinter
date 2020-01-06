@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
 use crate::futures::{Future, IntoFuture};
-use crate::rest_api::{into_bytes, ErrorResponse, Method, Resource};
+use crate::rest_api::{into_bytes, ErrorResponse, Method, Resource, get_authorization_token};
 use super::super::sessions::{Claims, validate_token, TokenValidationError};
 use super::super::secrets::SecretManager;
 use super::super::rest_api::BiomeRestConfig;
@@ -44,14 +44,40 @@ pub fn make_key_management_route(
         let rest_config = rest_config.clone();
         // let token_issuer = token_issuer.clone();
         let secret_manager = secret_manager.clone();
-        let f = request.headers().get("Authorization").unwrap().to_str().unwrap().split_whitespace().last().unwrap();
-        let user_id = request.match_info().get("user_id").unwrap();
-        let c = validate_token(f, &secret_manager.secret().unwrap(), &rest_config.issuer(), |claim| {
+        let auth_token = match get_authorization_token(&request) {
+            Ok(token) => token,
+            Err(err) => {
+                debug!("Failed to get token: {}", err);
+                return  Box::new(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized("User is not authorized")).into_future())
+            }
+        };
+        let user_id = request.match_info().get("user_id").unwrap_or_default();
+        if let Err(err) = validate_token(&auth_token, &secret_manager.secret().unwrap(), &rest_config.issuer(), |claim| {
             if user_id != claim.user_id() {
                 return Err(TokenValidationError::InvalidClaim(format!("User is not authorized to add keys for user {}", user_id)));
             }
             Ok(())
-        }).expect("err");
-        Box::new(HttpResponse::Ok().json(format!("auto {:?}", f)).into_future())
+        }) {
+            debug!("Invalid token: {}", err);
+            return  Box::new(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized("User is not authorized")).into_future())
+        };
+
+        Box::new(into_bytes(payload).and_then(move |bytes| {
+            let new_key = match serde_json::from_slice::<NewKey>(&bytes) {
+                Ok(val) => val,
+                Err(err) => {
+                    debug!("Error parsing payload {}", err);
+                    return HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(&format!(
+                            "Failed to parse payload: {}",
+                            err
+                        )))
+                        .into_future();
+                }
+            };
+
+        }))
     })
+    //     Box::new(HttpResponse::Ok().json(format!("auto {:?}", auth_token)).into_future())
+    // })
 }
