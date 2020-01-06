@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::database::postgres::helpers::{insert_key, list_keys, list_keys_with_user_id};
+use super::super::database::postgres::helpers::{
+    insert_key, list_keys, list_keys_with_user_id, update_key,
+};
 use super::super::store::{KeyStore, KeyStoreError};
 use super::super::Key;
 use crate::database::ConnectionPool;
@@ -46,8 +48,18 @@ impl KeyStore<Key> for PostgresKeyStore {
         Ok(())
     }
 
-    fn update_key(&self, _updated_key: Key) -> Result<(), KeyStoreError> {
-        unimplemented!()
+    fn update_key(&self, updated_key: Key) -> Result<(), KeyStoreError> {
+        update_key(
+            &*self.connection_pool.get()?,
+            &updated_key.user_id,
+            &updated_key.public_key,
+            &updated_key.display_name,
+        )
+        .map_err(|err| KeyStoreError::OperationError {
+            context: "Failed to update key".to_string(),
+            source: Box::new(err),
+        })?;
+        Ok(())
     }
 
     fn remove_key(&self, _public_key: &str, _user_id: &str) -> Result<Key, KeyStoreError> {
