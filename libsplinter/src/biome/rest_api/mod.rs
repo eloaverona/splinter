@@ -116,6 +116,7 @@ impl RestResourceProvider for BiomeRestResourceManager {
             // credentials_store.clone(),
             // self.user_store.clone(),
             self.rest_config.clone(),
+            self.key_store.clone(),
             self.token_secret_manager.clone(),
         ));
         resources
