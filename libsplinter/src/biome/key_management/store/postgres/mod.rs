@@ -48,7 +48,12 @@ impl KeyStore<Key> for PostgresKeyStore {
         Ok(())
     }
 
-    fn update_key(&self, public_key: &str, user_id: &str, new_display_name: &str) -> Result<(), KeyStoreError> {
+    fn update_key(
+        &self,
+        public_key: &str,
+        user_id: &str,
+        new_display_name: &str,
+    ) -> Result<(), KeyStoreError> {
         update_key(
             &*self.connection_pool.get()?,
             &user_id,
