@@ -93,7 +93,7 @@ pub trait RestResourceProvider {
     fn resources(&self) -> Vec<Resource>;
 }
 
-type HandlerFunction = Box<
+pub type HandlerFunction = Box<
     dyn Fn(HttpRequest, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
         + Send
         + Sync
@@ -193,8 +193,7 @@ impl Resource {
             ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
-            + 'static
-            + Clone,
+            + 'static,
     {
         Self::build(route).add_method(method, handle)
     }
@@ -214,8 +213,7 @@ impl Resource {
             ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
-            + 'static
-            + Clone,
+            + 'static,
     {
         self.methods.push((method, Arc::new(Box::new(handle))));
         self
