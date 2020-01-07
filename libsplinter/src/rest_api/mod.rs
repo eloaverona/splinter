@@ -396,7 +396,9 @@ pub fn get_authorization_token(request: &HttpRequest) -> Result<String, RequestE
         .split_whitespace()
         .last()
         .ok_or_else(|| {
-            RequestError::InvalidHeaderValue(format!("Authorization token not included in request"))
+            RequestError::InvalidHeaderValue(
+                "Authorization token not included in request".to_string(),
+            )
         })?
         .to_string())
 }

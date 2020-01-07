@@ -105,7 +105,7 @@ impl KeyStore<Key> for PostgresKeyStore {
                 }
             })?,
         };
-        let keys = query_result.into_iter().map(|key| Key::from(key)).collect();
+        let keys = query_result.into_iter().map(Key::from).collect();
         Ok(keys)
     }
 }

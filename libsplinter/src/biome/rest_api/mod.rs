@@ -113,8 +113,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
         };
         #[cfg(feature = "biome-key-management")]
         resources.push(make_key_management_route(
-            // credentials_store.clone(),
-            // self.user_store.clone(),
             self.rest_config.clone(),
             self.key_store.clone(),
             self.token_secret_manager.clone(),

@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
+use crate::actix_web::{HttpRequest, HttpResponse};
 use crate::futures::{Future, IntoFuture};
 use crate::rest_api::{
     get_authorization_token, into_bytes, ErrorResponse, HandlerFunction, Method, Resource,
@@ -67,11 +67,7 @@ pub fn make_key_management_route(
         )
         .add_method(
             Method::Patch,
-            handle_patch(
-                rest_config.clone(),
-                key_store.clone(),
-                secret_manager.clone(),
-            ),
+            handle_patch(rest_config, key_store, secret_manager),
         )
 }
 
@@ -84,26 +80,10 @@ fn handle_post(
         let rest_config = rest_config.clone();
         let key_store = key_store.clone();
         let secret_manager = secret_manager.clone();
-        let auth_token = match get_authorization_token(&request) {
-            Ok(token) => token,
-            Err(err) => {
-                debug!("Failed to get token: {}", err);
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized("User is not authorized"))
-                        .into_future(),
-                );
-            }
-        };
-        let user_id = request
-            .match_info()
-            .get("user_id")
-            .unwrap_or_default()
-            .to_owned();
-        let secret = match secret_manager.secret() {
-            Ok(secret) => secret,
-            Err(err) => {
-                debug!("Failed to fetch secret {}", err);
+        let user_id = match request.match_info().get("user_id") {
+            Some(id) => id.to_owned(),
+            None => {
+                error!("User ID is not in path request");
                 return Box::new(
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
@@ -112,22 +92,23 @@ fn handle_post(
             }
         };
 
-        if let Err(err) = validate_token(&auth_token, &secret, &rest_config.issuer(), |claim| {
-            if user_id != claim.user_id() {
-                return Err(TokenValidationError::InvalidClaim(format!(
-                    "User is not authorized to add keys for user {}",
-                    user_id
-                )));
+        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
+            AuthorizationResult::Authorized => (),
+            AuthorizationResult::Unauthorized(msg) => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized(&msg))
+                        .into_future(),
+                )
             }
-            Ok(())
-        }) {
-            debug!("Invalid token: {}", err);
-            return Box::new(
-                HttpResponse::Unauthorized()
-                    .json(ErrorResponse::unauthorized("User is not authorized"))
-                    .into_future(),
-            );
-        };
+            AuthorizationResult::Failed => {
+                return Box::new(
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future(),
+                );
+            }
+        }
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
             let new_key = match serde_json::from_slice::<NewKey>(&bytes) {
@@ -178,26 +159,10 @@ fn handle_get(
         let rest_config = rest_config.clone();
         let key_store = key_store.clone();
         let secret_manager = secret_manager.clone();
-        let auth_token = match get_authorization_token(&request) {
-            Ok(token) => token,
-            Err(err) => {
-                debug!("Failed to get token: {}", err);
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized("User is not authorized"))
-                        .into_future(),
-                );
-            }
-        };
-        let user_id = request
-            .match_info()
-            .get("user_id")
-            .unwrap_or_default()
-            .to_owned();
-        let secret = match secret_manager.secret() {
-            Ok(secret) => secret,
-            Err(err) => {
-                debug!("Failed to fetch secret {}", err);
+        let user_id = match request.match_info().get("user_id") {
+            Some(id) => id.to_owned(),
+            None => {
+                error!("User ID is not in path request");
                 return Box::new(
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
@@ -206,22 +171,23 @@ fn handle_get(
             }
         };
 
-        if let Err(err) = validate_token(&auth_token, &secret, &rest_config.issuer(), |claim| {
-            if user_id != claim.user_id() {
-                return Err(TokenValidationError::InvalidClaim(format!(
-                    "User is not authorized to add keys for user {}",
-                    user_id
-                )));
+        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
+            AuthorizationResult::Authorized => (),
+            AuthorizationResult::Unauthorized(msg) => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized(&msg))
+                        .into_future(),
+                )
             }
-            Ok(())
-        }) {
-            debug!("Invalid token: {}", err);
-            return Box::new(
-                HttpResponse::Unauthorized()
-                    .json(ErrorResponse::unauthorized("User is not authorized"))
-                    .into_future(),
-            );
-        };
+            AuthorizationResult::Failed => {
+                return Box::new(
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future(),
+                );
+            }
+        }
 
         match key_store.list_keys(Some(&user_id)) {
             Ok(keys) => Box::new(
@@ -250,26 +216,10 @@ fn handle_patch(
         let rest_config = rest_config.clone();
         let key_store = key_store.clone();
         let secret_manager = secret_manager.clone();
-        let auth_token = match get_authorization_token(&request) {
-            Ok(token) => token,
-            Err(err) => {
-                debug!("Failed to get token: {}", err);
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized("User is not authorized"))
-                        .into_future(),
-                );
-            }
-        };
-        let user_id = request
-            .match_info()
-            .get("user_id")
-            .unwrap_or_default()
-            .to_owned();
-        let secret = match secret_manager.secret() {
-            Ok(secret) => secret,
-            Err(err) => {
-                debug!("Failed to fetch secret {}", err);
+        let user_id = match request.match_info().get("user_id") {
+            Some(id) => id.to_owned(),
+            None => {
+                error!("User ID is not in path request");
                 return Box::new(
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
@@ -278,22 +228,23 @@ fn handle_patch(
             }
         };
 
-        if let Err(err) = validate_token(&auth_token, &secret, &rest_config.issuer(), |claim| {
-            if user_id != claim.user_id() {
-                return Err(TokenValidationError::InvalidClaim(format!(
-                    "User is not update keys for user {}",
-                    user_id
-                )));
+        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
+            AuthorizationResult::Authorized => (),
+            AuthorizationResult::Unauthorized(msg) => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized(&msg))
+                        .into_future(),
+                )
             }
-            Ok(())
-        }) {
-            debug!("Invalid token: {}", err);
-            return Box::new(
-                HttpResponse::Unauthorized()
-                    .json(ErrorResponse::unauthorized("User is not authorized"))
-                    .into_future(),
-            );
-        };
+            AuthorizationResult::Failed => {
+                return Box::new(
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future(),
+                );
+            }
+        }
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
             let updated_key = match serde_json::from_slice::<UpdatedKey>(&bytes) {
@@ -331,4 +282,48 @@ fn handle_patch(
             }
         }))
     })
+}
+
+enum AuthorizationResult {
+    Authorized,
+    Unauthorized(String),
+    Failed,
+}
+
+fn authorize_user(
+    request: &HttpRequest,
+    user_id: &str,
+    secret_manager: &Arc<dyn SecretManager>,
+    rest_config: &BiomeRestConfig,
+) -> AuthorizationResult {
+    let auth_token = match get_authorization_token(&request) {
+        Ok(token) => token,
+        Err(err) => {
+            debug!("Failed to get token: {}", err);
+            return AuthorizationResult::Unauthorized("User is not authorized".to_string());
+        }
+    };
+
+    let secret = match secret_manager.secret() {
+        Ok(secret) => secret,
+        Err(err) => {
+            debug!("Failed to fetch secret {}", err);
+            return AuthorizationResult::Failed;
+        }
+    };
+
+    if let Err(err) = validate_token(&auth_token, &secret, &rest_config.issuer(), |claim| {
+        if user_id != claim.user_id() {
+            return Err(TokenValidationError::InvalidClaim(format!(
+                "User is not update keys for user {}",
+                user_id
+            )));
+        }
+        Ok(())
+    }) {
+        debug!("Invalid token: {}", err);
+        return AuthorizationResult::Unauthorized("User is not authorized".to_string());
+    };
+
+    AuthorizationResult::Authorized
 }
