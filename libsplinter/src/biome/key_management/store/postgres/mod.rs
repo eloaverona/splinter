@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::database::postgres::helpers::{
+use diesel::result::{DatabaseErrorKind, Error as QueryError};
+
+ use super::super::database::postgres::helpers::{
     insert_key, list_keys, list_keys_with_user_id, update_key,
 };
 use super::super::store::{KeyStore, KeyStoreError};
@@ -39,7 +41,15 @@ impl PostgresKeyStore {
 impl KeyStore<Key> for PostgresKeyStore {
     fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
         let key_model = key.into();
-        insert_key(&*self.connection_pool.get()?, key_model).map_err(|err| {
+        insert_key(&*self.connection_pool.get()?, &key_model).map_err(|err| {
+            if let QueryError::DatabaseError(db_err, _) = err {
+                if let DatabaseErrorKind::UniqueViolation = db_err {
+                    return KeyStoreError::DuplicateKeyError(format!(
+                        "Public key {} for user {} is already in database",
+                        key_model.public_key, key_model.user_id
+                    ));
+                }
+            }
             KeyStoreError::OperationError {
                 context: "Failed to add key".to_string(),
                 source: Box::new(err),

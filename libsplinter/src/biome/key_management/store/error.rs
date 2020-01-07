@@ -41,6 +41,8 @@ pub enum KeyStoreError {
     ConnectionError(Box<dyn Error>),
     /// Returned when a key is not found by the provided ID
     NotFoundError(String),
+    /// Returned when a key with the same ID is already in the database
+    DuplicateKeyError(String),
 }
 
 impl Error for KeyStoreError {
@@ -51,6 +53,7 @@ impl Error for KeyStoreError {
             KeyStoreError::StorageError { source, .. } => Some(&**source),
             KeyStoreError::ConnectionError(err) => Some(&**err),
             KeyStoreError::NotFoundError(_) => None,
+            KeyStoreError::DuplicateKeyError(_) => None,
         }
     }
 }
@@ -73,6 +76,7 @@ impl fmt::Display for KeyStoreError {
                 write!(f, "failed to connect to underlying storage: {}", err)
             }
             KeyStoreError::NotFoundError(msg) => write!(f, "key not found: {}", msg),
+            KeyStoreError::DuplicateKeyError(msg) => write!(f, "key already exists: {}", msg),
         }
     }
 }

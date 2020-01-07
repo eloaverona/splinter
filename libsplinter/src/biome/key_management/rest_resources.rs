@@ -128,9 +128,14 @@ pub fn make_key_management_route(
                         .into_future(),
                     Err(err) => {
                         debug!("Failed to add new key to database {}", err);
-                        HttpResponse::InternalServerError()
-                            .json(ErrorResponse::internal_error())
-                            .into_future()
+                        match err {
+                            KeyStoreError::DuplicateKeyError(msg) => HttpResponse::bad_request()
+                                .json(ErrorResponse::not_found(&msg))
+                                .into_future(),
+                            _ => HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                                .into_future(),
+                        }
                     }
                 }
             }))
