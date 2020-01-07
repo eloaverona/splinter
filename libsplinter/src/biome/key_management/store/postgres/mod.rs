@@ -14,7 +14,7 @@
 
 use diesel::result::{DatabaseErrorKind, Error as QueryError};
 
- use super::super::database::postgres::helpers::{
+use super::super::database::postgres::helpers::{
     insert_key, list_keys, list_keys_with_user_id, update_key,
 };
 use super::super::store::{KeyStore, KeyStoreError};
