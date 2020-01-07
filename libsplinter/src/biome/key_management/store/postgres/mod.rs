@@ -54,7 +54,7 @@ impl KeyStore<Key> for PostgresKeyStore {
         user_id: &str,
         new_display_name: &str,
     ) -> Result<(), KeyStoreError> {
-        update_key(
+        let updated_row = update_key(
             &*self.connection_pool.get()?,
             &user_id,
             &public_key,
@@ -64,6 +64,12 @@ impl KeyStore<Key> for PostgresKeyStore {
             context: "Failed to update key".to_string(),
             source: Box::new(err),
         })?;
+        if updated_row == 0 {
+            return Err(KeyStoreError::NotFoundError(format!(
+                "Key with public key {}, and user ID {} not found",
+                public_key, user_id
+            )));
+        }
         Ok(())
     }
 

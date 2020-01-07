@@ -36,9 +36,8 @@ pub fn update_key(
     user_id: &str,
     public_key: &str,
     display_name: &str,
-) -> QueryResult<()> {
+) -> QueryResult<usize> {
     diesel::update(keys::table.find((public_key, user_id)))
         .set((keys::display_name.eq(display_name),))
         .execute(conn)
-        .map(|_| ())
 }

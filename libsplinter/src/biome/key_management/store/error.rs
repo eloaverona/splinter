@@ -39,6 +39,8 @@ pub enum KeyStoreError {
     },
     /// Represents an issue connecting to the database
     ConnectionError(Box<dyn Error>),
+    /// Returned when a key is not found by the provided ID
+    NotFoundError(String),
 }
 
 impl Error for KeyStoreError {
@@ -48,6 +50,7 @@ impl Error for KeyStoreError {
             KeyStoreError::QueryError { source, .. } => Some(&**source),
             KeyStoreError::StorageError { source, .. } => Some(&**source),
             KeyStoreError::ConnectionError(err) => Some(&**err),
+            KeyStoreError::NotFoundError(_) => None,
         }
     }
 }
@@ -69,6 +72,7 @@ impl fmt::Display for KeyStoreError {
             KeyStoreError::ConnectionError(err) => {
                 write!(f, "failed to connect to underlying storage: {}", err)
             }
+            KeyStoreError::NotFoundError(msg) => write!(f, "key not found: {}", msg),
         }
     }
 }

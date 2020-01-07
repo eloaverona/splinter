@@ -22,7 +22,10 @@ use super::super::rest_api::BiomeRestConfig;
 use super::super::secrets::SecretManager;
 use super::super::sessions::{validate_token, TokenValidationError};
 
-use super::{store::KeyStore, Key};
+use super::{
+    store::{KeyStore, KeyStoreError},
+    Key,
+};
 
 #[derive(Deserialize)]
 struct NewKey {
@@ -270,9 +273,14 @@ pub fn make_key_management_route(
                         .into_future(),
                     Err(err) => {
                         debug!("Failed to update key {}", err);
-                        HttpResponse::InternalServerError()
-                            .json(ErrorResponse::internal_error())
-                            .into_future()
+                        match err {
+                            KeyStoreError::NotFoundError(msg) => HttpResponse::NotFound()
+                                .json(ErrorResponse::not_found(&msg))
+                                .into_future(),
+                            _ => HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                                .into_future(),
+                        }
                     }
                 }
             }))
