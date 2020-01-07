@@ -105,7 +105,7 @@ fn handle_post(
             Err(err) => {
                 debug!("Failed to fetch secret {}", err);
                 return Box::new(
-                    HttpResponse::Unauthorized()
+                    HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
                         .into_future(),
                 );
@@ -199,7 +199,7 @@ fn handle_get(
             Err(err) => {
                 debug!("Failed to fetch secret {}", err);
                 return Box::new(
-                    HttpResponse::Unauthorized()
+                    HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
                         .into_future(),
                 );
@@ -271,7 +271,7 @@ fn handle_patch(
             Err(err) => {
                 debug!("Failed to fetch secret {}", err);
                 return Box::new(
-                    HttpResponse::Unauthorized()
+                    HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
                         .into_future(),
                 );
