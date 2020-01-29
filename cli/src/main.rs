@@ -354,7 +354,8 @@ fn run() -> Result<(), CliError> {
                                     SubCommand::with_name("management-type")
                                         .about("Unset default value for management type"),
                                 ),
-                        ),
+                        )
+                        .subcommand(SubCommand::with_name("list").about("List set default values")),
                 ),
         );
 
@@ -497,7 +498,8 @@ fn run() -> Result<(), CliError> {
                                     "management-type",
                                     circuit::defaults::UnsetManagementTypeDefaultAction,
                                 ),
-                        ),
+                        )
+                        .with_command("list", circuit::defaults::ListDefaultsAction),
                 ),
         );
         subcommands = subcommands.with_command(

@@ -75,6 +75,24 @@ impl Action for UnsetManagementTypeDefaultAction {
     }
 }
 
+pub struct ListDefaultsAction;
+
+impl Action for ListDefaultsAction {
+    fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let default_manager = DefaultValueManager::default();
+
+        let defaults = default_manager.list_defaults()?;
+        if defaults.is_empty() {
+            println!("No defaults have been set yet");
+        } else {
+            defaults.iter().for_each(|default_val| {
+                println!("{} {}", default_val.key(), default_val.value());
+            })
+        }
+        Ok(())
+    }
+}
+
 impl From<DefaultValueManagerError> for CliError {
     fn from(err: DefaultValueManagerError) -> Self {
         CliError::ActionError(format!("Failed to perform defaults operation: {}", err))
