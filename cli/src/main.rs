@@ -323,6 +323,23 @@ fn run() -> Result<(), CliError> {
                                                 .long("force")
                                                 .help("Overwrite default if it is already set"),
                                         ),
+                                )
+                                .subcommand(
+                                    SubCommand::with_name("management-type")
+                                        .about("Set default value for management type")
+                                        .arg(
+                                            Arg::with_name("management_type")
+                                                .takes_value(true)
+                                                .help(
+                                                    "The default management type for new circuits",
+                                                ),
+                                        )
+                                        .arg(
+                                            Arg::with_name("force")
+                                                .short("f")
+                                                .long("force")
+                                                .help("Overwrite default if it is already set"),
+                                        ),
                                 ),
                         ),
                 ),
@@ -445,10 +462,15 @@ fn run() -> Result<(), CliError> {
                     "default",
                     SubcommandActions::new().with_command(
                         "set",
-                        SubcommandActions::new().with_command(
-                            "service-type",
-                            circuit::defaults::SetServiceTypeDefaultAction,
-                        ),
+                        SubcommandActions::new()
+                            .with_command(
+                                "service-type",
+                                circuit::defaults::SetServiceTypeDefaultAction,
+                            )
+                            .with_command(
+                                "management-type",
+                                circuit::defaults::SetManagementTypeDefaultAction,
+                            ),
                     ),
                 ),
         );
