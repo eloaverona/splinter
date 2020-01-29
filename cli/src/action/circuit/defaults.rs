@@ -37,6 +37,24 @@ impl Action for SetServiceTypeDefaultAction {
     }
 }
 
+pub struct SetManagementTypeDefaultAction;
+
+impl Action for SetManagementTypeDefaultAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+
+        let management_type = match args.value_of("management_type") {
+            Some(management) => management,
+            None => return Err(CliError::ActionError("management-type is required".into())),
+        };
+
+        let default_manager = DefaultValueManager::default();
+        default_manager.set_default_management_type(management_type, args.is_present("force"))?;
+
+        Ok(())
+    }
+}
+
 impl From<DefaultValueManagerError> for CliError {
     fn from(err: DefaultValueManagerError) -> Self {
         CliError::ActionError(format!("Failed to perform defaults operation: {}", err))
