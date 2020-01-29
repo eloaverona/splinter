@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod default_value;
 mod node;
 
+pub use default_value::{DefaultValue, DefaultValueManager, DefaultValueManagerError};
 pub use node::{Node, NodeManager, NodeManagerError};
