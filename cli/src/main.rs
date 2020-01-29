@@ -304,6 +304,30 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .takes_value(true),
                         ),
+                )
+                .subcommand(
+                    SubCommand::with_name("default")
+                        .about("Manage default values for circuit creation")
+                        .subcommand(
+                            SubCommand::with_name("set")
+                                .about("Set a default value")
+                                .setting(AppSettings::SubcommandRequiredElseHelp)
+                                .subcommand(
+                                    SubCommand::with_name("service-type")
+                                        .about("Set default value for service type")
+                                        .arg(
+                                            Arg::with_name("service_type")
+                                                .takes_value(true)
+                                                .help("The default service type for new circuits"),
+                                        )
+                                        .arg(
+                                            Arg::with_name("force")
+                                                .short("f")
+                                                .long("force")
+                                                .help("Overwrite default if it is already set"),
+                                        ),
+                                ),
+                        ),
                 ),
         );
 
@@ -419,7 +443,17 @@ fn run() -> Result<(), CliError> {
                 .with_command("vote", circuit::CircuitVoteAction)
                 .with_command("list", circuit::CircuitListAction)
                 .with_command("show", circuit::CircuitShowAction)
-                .with_command("proposals", circuit::CircuitProposalsAction),
+                .with_command("proposals", circuit::CircuitProposalsAction)
+                .with_command(
+                    "default",
+                    SubcommandActions::new().with_command(
+                        "set",
+                        SubcommandActions::new().with_command(
+                            "service-type",
+                            circuit::defaults::SetServiceTypeDefaultAction,
+                        ),
+                    ),
+                ),
         );
         subcommands = subcommands.with_command(
             "node",
