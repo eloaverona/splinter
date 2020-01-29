@@ -358,6 +358,15 @@ fn run() -> Result<(), CliError> {
                                         .about("Unset default value for management type"),
                                 ),
                         )
+                        .subcommand(
+                            SubCommand::with_name("get")
+                                .about("Get a default value")
+                                .setting(AppSettings::SubcommandRequiredElseHelp)
+                                .subcommand(
+                                    SubCommand::with_name("service-type")
+                                        .about("Get the default value for service type"),
+                                ),
+                        )
                         .subcommand(SubCommand::with_name("list").about("List set default values")),
                 ),
         );
@@ -501,6 +510,13 @@ fn run() -> Result<(), CliError> {
                                     "management-type",
                                     circuit::defaults::UnsetManagementTypeDefaultAction,
                                 ),
+                        )
+                        .with_command(
+                            "get",
+                            SubcommandActions::new().with_command(
+                                "service-type",
+                                circuit::defaults::GetServiceTypeDefaultAction,
+                            ),
                         )
                         .with_command("list", circuit::defaults::ListDefaultsAction),
                 ),
