@@ -349,6 +349,10 @@ fn run() -> Result<(), CliError> {
                                 .subcommand(
                                     SubCommand::with_name("service-type")
                                         .about("Unset default value for service type"),
+                                )
+                                .subcommand(
+                                    SubCommand::with_name("management-type")
+                                        .about("Unset default value for management type"),
                                 ),
                         ),
                 ),
@@ -484,10 +488,15 @@ fn run() -> Result<(), CliError> {
                         )
                         .with_command(
                             "unset",
-                            SubcommandActions::new().with_command(
-                                "service-type",
-                                circuit::defaults::UnsetServiceTypeDefaultAction,
-                            ),
+                            SubcommandActions::new()
+                                .with_command(
+                                    "service-type",
+                                    circuit::defaults::UnsetServiceTypeDefaultAction,
+                                )
+                                .with_command(
+                                    "management-type",
+                                    circuit::defaults::UnsetManagementTypeDefaultAction,
+                                ),
                         ),
                 ),
         );
