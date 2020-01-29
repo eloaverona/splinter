@@ -15,6 +15,8 @@
 use std::error::Error;
 use std::fmt;
 
+use super::super::YamlBackedStoreError;
+
 #[derive(Debug)]
 pub enum NodeStoreError {
     NotFound(String),
@@ -31,5 +33,11 @@ impl fmt::Display for NodeStoreError {
                 write!(f, "The underlying store encountered an error {}", err)
             }
         }
+    }
+}
+
+impl From<YamlBackedStoreError> for NodeStoreError {
+    fn from(err: YamlBackedStoreError) -> NodeStoreError {
+        NodeStoreError::OperationFailed(Box::new(err))
     }
 }
