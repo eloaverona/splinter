@@ -344,6 +344,15 @@ fn run() -> Result<(), CliError> {
                                         .takes_value(true)
                                         .help("Alias for the node"),
                                 ),
+                        )
+                        .subcommand(
+                            SubCommand::with_name("delete")
+                                .about("Delete alias for a node")
+                                .arg(
+                                    Arg::with_name("alias")
+                                        .takes_value(true)
+                                        .help("Alias for the node"),
+                                ),
                         ),
                 ),
         );
@@ -419,7 +428,8 @@ fn run() -> Result<(), CliError> {
                 SubcommandActions::new()
                     .with_command("add", node::AddNodeAliasAction)
                     .with_command("get", node::GetNodeAliasAction)
-                    .with_command("list", node::ListNodeAliasAction),
+                    .with_command("list", node::ListNodeAliasAction)
+                    .with_command("delete", node::DeleteNodeAliasAction),
             ),
         )
     }
