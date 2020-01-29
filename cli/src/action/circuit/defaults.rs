@@ -89,6 +89,20 @@ impl Action for UnsetManagementTypeDefaultAction {
     }
 }
 
+pub struct GetManagementTypeDefaultAction;
+
+impl Action for GetManagementTypeDefaultAction {
+    fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let default_manager = DefaultValueManager::default();
+
+        let default_value = default_manager.get_default_management_type()?;
+
+        println!("{} {}", default_value.key(), default_value.value());
+
+        Ok(())
+    }
+}
+
 pub struct ListDefaultsAction;
 
 impl Action for ListDefaultsAction {

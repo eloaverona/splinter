@@ -365,6 +365,10 @@ fn run() -> Result<(), CliError> {
                                 .subcommand(
                                     SubCommand::with_name("service-type")
                                         .about("Get the default value for service type"),
+                                )
+                                .subcommand(
+                                    SubCommand::with_name("management-type")
+                                        .about("Get the default value for management type"),
                                 ),
                         )
                         .subcommand(SubCommand::with_name("list").about("List set default values")),
@@ -513,10 +517,15 @@ fn run() -> Result<(), CliError> {
                         )
                         .with_command(
                             "get",
-                            SubcommandActions::new().with_command(
-                                "service-type",
-                                circuit::defaults::GetServiceTypeDefaultAction,
-                            ),
+                            SubcommandActions::new()
+                                .with_command(
+                                    "service-type",
+                                    circuit::defaults::GetServiceTypeDefaultAction,
+                                )
+                                .with_command(
+                                    "management-type",
+                                    circuit::defaults::GetManagementTypeDefaultAction,
+                                ),
                         )
                         .with_command("list", circuit::defaults::ListDefaultsAction),
                 ),
