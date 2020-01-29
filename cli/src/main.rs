@@ -341,6 +341,15 @@ fn run() -> Result<(), CliError> {
                                                 .help("Overwrite default if it is already set"),
                                         ),
                                 ),
+                        )
+                        .subcommand(
+                            SubCommand::with_name("unset")
+                                .about("Unset a default value")
+                                .setting(AppSettings::SubcommandRequiredElseHelp)
+                                .subcommand(
+                                    SubCommand::with_name("service-type")
+                                        .about("Unset default value for service type"),
+                                ),
                         ),
                 ),
         );
@@ -460,18 +469,26 @@ fn run() -> Result<(), CliError> {
                 .with_command("proposals", circuit::CircuitProposalsAction)
                 .with_command(
                     "default",
-                    SubcommandActions::new().with_command(
-                        "set",
-                        SubcommandActions::new()
-                            .with_command(
+                    SubcommandActions::new()
+                        .with_command(
+                            "set",
+                            SubcommandActions::new()
+                                .with_command(
+                                    "service-type",
+                                    circuit::defaults::SetServiceTypeDefaultAction,
+                                )
+                                .with_command(
+                                    "management-type",
+                                    circuit::defaults::SetManagementTypeDefaultAction,
+                                ),
+                        )
+                        .with_command(
+                            "unset",
+                            SubcommandActions::new().with_command(
                                 "service-type",
-                                circuit::defaults::SetServiceTypeDefaultAction,
-                            )
-                            .with_command(
-                                "management-type",
-                                circuit::defaults::SetManagementTypeDefaultAction,
+                                circuit::defaults::UnsetServiceTypeDefaultAction,
                             ),
-                    ),
+                        ),
                 ),
         );
         subcommands = subcommands.with_command(
