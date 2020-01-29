@@ -22,6 +22,9 @@ mod error;
 #[cfg(feature = "circuit")]
 mod store;
 
+#[cfg(feature = "circuit")]
+mod manager;
+
 use clap::clap_app;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
