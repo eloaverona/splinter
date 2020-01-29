@@ -40,6 +40,25 @@ impl Action for AddNodeAliasAction {
     }
 }
 
+pub struct ListNodeAliasAction;
+
+impl Action for ListNodeAliasAction {
+    fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let node_manager = NodeManager::default();
+
+        let nodes = node_manager.list_nodes()?;
+
+        if nodes.is_empty() {
+            println!("No node alias have been set yet");
+        } else {
+            nodes.iter().for_each(|node| {
+                println!("{} {}", node.alias(), node.endpoint());
+            })
+        }
+        Ok(())
+    }
+}
+
 impl From<NodeManagerError> for CliError {
     fn from(err: NodeManagerError) -> Self {
         CliError::ActionError(format!("Failed to perform node operation: {}", err))

@@ -334,7 +334,8 @@ fn run() -> Result<(), CliError> {
                                         .long("force")
                                         .help("Overwrite alias data if it already exists"),
                                 ),
-                        ),
+                        )
+                        .subcommand(SubCommand::with_name("list").about("List all node alias")),
                 ),
         );
     }
@@ -406,7 +407,9 @@ fn run() -> Result<(), CliError> {
             "node",
             SubcommandActions::new().with_command(
                 "alias",
-                SubcommandActions::new().with_command("add", node::AddNodeAliasAction),
+                SubcommandActions::new()
+                    .with_command("add", node::AddNodeAliasAction)
+                    .with_command("list", node::ListNodeAliasAction),
             ),
         )
     }
