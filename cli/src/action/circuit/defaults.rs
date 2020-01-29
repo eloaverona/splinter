@@ -65,6 +65,16 @@ impl Action for SetManagementTypeDefaultAction {
     }
 }
 
+pub struct UnsetManagementTypeDefaultAction;
+
+impl Action for UnsetManagementTypeDefaultAction {
+    fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let default_manager = DefaultValueManager::default();
+        default_manager.unset_default_management_type()?;
+        Ok(())
+    }
+}
+
 impl From<DefaultValueManagerError> for CliError {
     fn from(err: DefaultValueManagerError) -> Self {
         CliError::ActionError(format!("Failed to perform defaults operation: {}", err))
