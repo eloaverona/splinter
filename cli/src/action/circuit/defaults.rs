@@ -37,6 +37,16 @@ impl Action for SetServiceTypeDefaultAction {
     }
 }
 
+pub struct UnsetServiceTypeDefaultAction;
+
+impl Action for UnsetServiceTypeDefaultAction {
+    fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let default_manager = DefaultValueManager::default();
+        default_manager.unset_default_service_type()?;
+        Ok(())
+    }
+}
+
 pub struct SetManagementTypeDefaultAction;
 
 impl Action for SetManagementTypeDefaultAction {
