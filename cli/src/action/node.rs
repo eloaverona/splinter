@@ -14,8 +14,10 @@
 
 use super::Action;
 use crate::error::CliError;
-use crate::manager::{Node, NodeManager, NodeManagerError};
+use crate::store::node::{FileBackedNodeStore, Node, NodeStore, NodeStoreError};
+
 use clap::ArgMatches;
+use reqwest::Url;
 
 pub struct AddNodeAliasAction;
 
@@ -30,11 +32,20 @@ impl Action for AddNodeAliasAction {
             Some(endpoint) => endpoint,
             None => return Err(CliError::ActionError("Endpoint is required".into())),
         };
+
+        validate_node_endpont(&endpoint)?;
+
+        let node_store = get_node_store();
+
+        if !args.is_present("force") && node_store.get_node(&alias)?.is_some() {
+            return Err(CliError::ActionError(format!(
+                "Alias {} is already in use",
+                alias
+            )));
+        }
         let node = Node::new(alias, endpoint);
 
-        let node_manager = NodeManager::default();
-
-        node_manager.add_node(&node, args.is_present("force"))?;
+        node_store.add_node(&node)?;
 
         Ok(())
     }
@@ -50,9 +61,9 @@ impl Action for GetNodeAliasAction {
             None => return Err(CliError::ActionError("Alias is required".into())),
         };
 
-        let node_manager = NodeManager::default();
+        let node_store = get_node_store();
 
-        let node = node_manager.get_node(alias)?;
+        let node = node_store.get_node(alias)?;
 
         if let Some(node) = node {
             println!("{} {}", node.alias(), node.endpoint())
@@ -68,9 +79,9 @@ pub struct ListNodeAliasAction;
 
 impl Action for ListNodeAliasAction {
     fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let node_manager = NodeManager::default();
+        let node_store = get_node_store();
 
-        let nodes = node_manager.list_nodes()?;
+        let nodes = node_store.list_nodes()?;
 
         if nodes.is_empty() {
             println!("No node alias have been set yet");
@@ -94,16 +105,31 @@ impl Action for DeleteNodeAliasAction {
             None => return Err(CliError::ActionError("Alias is required".into())),
         };
 
-        let node_manager = NodeManager::default();
+        let node_store = get_node_store();
 
-        node_manager.delete_node(alias)?;
+        node_store.delete_node(alias)?;
 
         Ok(())
     }
 }
 
-impl From<NodeManagerError> for CliError {
-    fn from(err: NodeManagerError) -> Self {
+fn get_node_store() -> FileBackedNodeStore {
+    FileBackedNodeStore::default()
+}
+
+fn validate_node_endpont(endpoint: &str) -> Result<(), CliError> {
+    if let Err(err) = Url::parse(endpoint) {
+        Err(CliError::ActionError(format!(
+            "{} is not a valid url: {}",
+            endpoint, err
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+impl From<NodeStoreError> for CliError {
+    fn from(err: NodeStoreError) -> Self {
         CliError::ActionError(format!("Failed to perform node operation: {}", err))
     }
 }
