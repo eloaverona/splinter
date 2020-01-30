@@ -14,13 +14,15 @@
 
 use std::error::Error;
 use std::fmt;
+use std::io::Error as IoError;
 
-use super::super::YamlBackedStoreError;
+use serde_yaml::Error as SerdeError;
 
 #[derive(Debug)]
 pub enum NodeStoreError {
     NotFound(String),
-    OperationFailed(Box<dyn Error>),
+    IoError(IoError),
+    SerdeError(SerdeError),
 }
 
 impl Error for NodeStoreError {}
@@ -29,15 +31,26 @@ impl fmt::Display for NodeStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             NodeStoreError::NotFound(msg) => write!(f, "Node not found: {}", msg),
-            NodeStoreError::OperationFailed(err) => {
-                write!(f, "The underlying store encountered an error {}", err)
+            NodeStoreError::IoError(err) => {
+                write!(f, "Node store encountered an IO error: {}", err)
             }
+            NodeStoreError::SerdeError(err) => write!(
+                f,
+                "Node store encountered and serialization/deserialization error  {}",
+                err
+            ),
         }
     }
 }
 
-impl From<YamlBackedStoreError> for NodeStoreError {
-    fn from(err: YamlBackedStoreError) -> NodeStoreError {
-        NodeStoreError::OperationFailed(Box::new(err))
+impl From<IoError> for NodeStoreError {
+    fn from(err: IoError) -> NodeStoreError {
+        NodeStoreError::IoError(err)
+    }
+}
+
+impl From<SerdeError> for NodeStoreError {
+    fn from(err: SerdeError) -> NodeStoreError {
+        NodeStoreError::SerdeError(err)
     }
 }

@@ -13,11 +13,14 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Error as IoError, ErrorKind};
+use std::path::PathBuf;
 
-use super::super::yaml_store::YamlBackedStore;
 use super::{Node, NodeStore, NodeStoreError};
 
-const DEFAULT_FILE_NAME: &str = "node_alias";
+const DEFAULT_FILE_NAME: &str = "node_alias.yaml";
+const DEFAULTS_PATH: &str = ".splinter";
 
 #[derive(Serialize, Deserialize)]
 pub struct SerdeNode {
@@ -55,11 +58,11 @@ impl Default for FileBackedNodeStore {
     }
 }
 
-impl YamlBackedStore<SerdeNode> for FileBackedNodeStore {}
+// impl YamlBackedStore<SerdeNode> for FileBackedNodeStore {}
 
 impl NodeStore for FileBackedNodeStore {
     fn get_node(&self, alias: &str) -> Result<Option<Node>, NodeStoreError> {
-        let nodes = Self::read_data_from_file(&self.file_name)?;
+        let nodes = self.load()?;
 
         let node = nodes.into_iter().find_map(|node| {
             if node.alias == alias {
@@ -72,7 +75,7 @@ impl NodeStore for FileBackedNodeStore {
     }
 
     fn list_nodes(&self) -> Result<Vec<Node>, NodeStoreError> {
-        let serde_nodes = Self::read_data_from_file(&self.file_name)?;
+        let serde_nodes = self.load()?;
         let nodes = serde_nodes
             .into_iter()
             .map(|node| node.into())
@@ -81,7 +84,7 @@ impl NodeStore for FileBackedNodeStore {
     }
 
     fn add_node(&self, new_node: &Node) -> Result<(), NodeStoreError> {
-        let mut serde_nodes = Self::read_data_from_file(&self.file_name)?;
+        let mut serde_nodes = self.load()?;
         let existing_node_index = serde_nodes.iter().enumerate().find_map(|(index, node)| {
             if new_node.alias() == node.alias {
                 Some(index)
@@ -94,13 +97,13 @@ impl NodeStore for FileBackedNodeStore {
         }
         serde_nodes.push(SerdeNode::from(new_node));
 
-        Self::write_to_file(&self.file_name, &serde_nodes)?;
+        self.save(&serde_nodes)?;
 
         Ok(())
     }
 
     fn delete_node(&self, alias: &str) -> Result<(), NodeStoreError> {
-        let mut serde_nodes = Self::read_data_from_file(&self.file_name)?;
+        let mut serde_nodes = self.load()?;
         let existing_node_index = serde_nodes.iter().enumerate().find_map(|(index, node)| {
             if node.alias == alias {
                 Some(index)
@@ -112,7 +115,7 @@ impl NodeStore for FileBackedNodeStore {
         match existing_node_index {
             Some(index) => {
                 serde_nodes.remove(index);
-                Self::write_to_file(&self.file_name, &serde_nodes)?;
+                self.save(&serde_nodes)?;
             }
             None => {
                 return Err(NodeStoreError::NotFound(format!(
@@ -124,4 +127,55 @@ impl NodeStore for FileBackedNodeStore {
 
         Ok(())
     }
+}
+
+impl FileBackedNodeStore {
+    fn load(&self) -> Result<Vec<SerdeNode>, NodeStoreError> {
+        let file = open_file(false, &self.file_name)?;
+
+        if file.metadata()?.len() == 0 {
+            return Ok(vec![]);
+        }
+
+        let nodes = serde_yaml::from_reader(file)?;
+        Ok(nodes)
+    }
+
+    fn save(&self, nodes: &[SerdeNode]) -> Result<(), NodeStoreError> {
+        let temp_file_name = format!("{}.tmp", self.file_name);
+        let file = open_file(true, &temp_file_name)?;
+
+        serde_yaml::to_writer(file, &nodes)?;
+
+        let temp_file_path = build_file_path(&temp_file_name)?;
+        let perm_file_path = build_file_path(&self.file_name)?;
+        fs::rename(temp_file_path, perm_file_path)?;
+        Ok(())
+    }
+}
+
+fn build_file_path(file_name: &str) -> Result<PathBuf, NodeStoreError> {
+    let mut path = get_file_path()?;
+    path.push(file_name);
+    Ok(path)
+}
+
+fn open_file(truncate: bool, file_name: &str) -> Result<File, NodeStoreError> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(truncate)
+        .open(&build_file_path(file_name)?)?;
+    Ok(file)
+}
+
+fn get_file_path() -> Result<PathBuf, NodeStoreError> {
+    let mut path = dirs::home_dir().ok_or_else(|| {
+        let err = IoError::new(ErrorKind::NotFound, "Home directory not found");
+        NodeStoreError::IoError(err)
+    })?;
+    path.push(DEFAULTS_PATH);
+    fs::create_dir_all(&path)?;
+    Ok(path)
 }
