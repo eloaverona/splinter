@@ -11,8 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 use std::error::Error;
 use std::fmt;
+use std::io::Error as IoError;
 
 #[derive(Debug)]
 pub enum CliError {
@@ -38,5 +40,12 @@ impl fmt::Display for CliError {
             #[cfg(feature = "database")]
             CliError::DatabaseError(msg) => write!(f, "database error: {}", msg),
         }
+    }
+}
+
+impl From<IoError> for CliError {
+    fn from(err: IoError) -> Self {
+        debug!("CLI encountered an IO error {}", err);
+        CliError::ActionError("Failed to read/write data".to_string())
     }
 }

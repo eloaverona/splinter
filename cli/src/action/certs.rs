@@ -14,7 +14,7 @@
 
 use std::env;
 use std::fs::{self, metadata, OpenOptions};
-use std::io;
+//use std::io;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
@@ -721,11 +721,11 @@ fn log_overwriting(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(
     Ok(())
 }
 
-impl From<io::Error> for CliError {
-    fn from(io_error: io::Error) -> Self {
-        CliError::ActionError(io_error.to_string())
-    }
-}
+// impl From<io::Error> for CliError {
+//     fn from(io_error: io::Error) -> Self {
+//         CliError::ActionError(io_error.to_string())
+//     }
+// }
 
 impl From<ErrorStack> for CliError {
     fn from(error_stack: ErrorStack) -> Self {

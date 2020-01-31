@@ -89,6 +89,7 @@ fn run() -> Result<(), CliError> {
                 (@arg skip: --skip conflicts_with[force] "Check if files exists, generate if missing")
             )
         )
+
     );
 
     #[cfg(feature = "keygen")]
@@ -193,9 +194,55 @@ fn run() -> Result<(), CliError> {
                         )
                         .arg(
                             Arg::with_name("path")
+                                .long("path")
                                 .takes_value(true)
-                                .required(true)
+                                //.required(true)
                                 .help("Path to a yaml file that defines the circuit proposal"),
+                        )
+                        .arg(
+                            Arg::with_name("node")
+                                .long("node")
+                                .takes_value(true)
+                                .multiple(true)
+                                //.required(true)
+                                .help("Node that part of the circuit, accepts node alias if set or node enpoint"),
+                        )
+                        .arg(
+                            Arg::with_name("service")
+                                .long("service")
+                                .takes_value(true)
+                                .multiple(true)
+                                .min_values(2)
+                                .required(true)
+                                .help("Service ID and allowed node. Format <service-id>::<allowed_nodes>"),
+                        )
+                        .arg(
+                            Arg::with_name("service_argument")
+                                .long("service-argument")
+                                .takes_value(true)
+                                .multiple(true)
+                                .help("Special arguments to be passed to the service. Format <service_id>::<key>=<value>"),
+                        )
+                        .arg(
+                            Arg::with_name("management_type")
+                                .long("management-type")
+                                .takes_value(true)
+                                .help("Management type for a service"),
+                        )
+                        .arg(
+                            Arg::with_name("authorization_type")
+                                .long("auth-type")
+                                .takes_value(true)
+                                .help("Authorization type for a service. Default trust"),
+                        )
+                        .arg(
+                            Arg::with_name("service_type")
+                                .long("service-type")
+                                .takes_value(true)
+                                .multiple(true)
+                                //.min_values(2)
+                                //.required(true)
+                                .help("Service type for a service. Format <service-id>::<service_type>"),
                         ),
                 )
                 .subcommand(
