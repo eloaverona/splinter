@@ -14,13 +14,15 @@
 
 use std::error::Error;
 use std::fmt;
+use std::io::Error as IoError;
 
-use super::super::YamlBackedStoreError;
+use serde_yaml::Error as SerdeError;
 
 #[derive(Debug)]
 pub enum DefaultStoreError {
     NotSet(String),
-    OperationFailed(Box<dyn Error>),
+    IoError(IoError),
+    SerdeError(SerdeError),
 }
 
 impl Error for DefaultStoreError {}
@@ -29,15 +31,26 @@ impl fmt::Display for DefaultStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DefaultStoreError::NotSet(msg) => write!(f, "Default not set: {}", msg),
-            DefaultStoreError::OperationFailed(err) => {
-                write!(f, "The underlying store encountered an error {}", err)
+            DefaultStoreError::IoError(err) => {
+                write!(f, "Default value store encountered an IO error: {}", err)
             }
+            DefaultStoreError::SerdeError(err) => write!(
+                f,
+                "Default value store encountered and serialization/deserialization error  {}",
+                err
+            ),
         }
     }
 }
 
-impl From<YamlBackedStoreError> for DefaultStoreError {
-    fn from(err: YamlBackedStoreError) -> DefaultStoreError {
-        DefaultStoreError::OperationFailed(Box::new(err))
+impl From<IoError> for DefaultStoreError {
+    fn from(err: IoError) -> DefaultStoreError {
+        DefaultStoreError::IoError(err)
+    }
+}
+
+impl From<SerdeError> for DefaultStoreError {
+    fn from(err: SerdeError) -> DefaultStoreError {
+        DefaultStoreError::SerdeError(err)
     }
 }

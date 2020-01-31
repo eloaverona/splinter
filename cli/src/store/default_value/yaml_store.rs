@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fs::{self, File, OpenOptions};
+use std::io::{Error as IoError, ErrorKind};
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
-use super::super::yaml_store::YamlBackedStore;
 use super::{DefaultStoreError, DefaultValue, DefaultValueStore};
 
-const DEFAULT_FILE_NAME: &str = "circuit_defaults";
+const DEFAULT_FILE_NAME: &str = "circuit_default_values.yaml";
+const DEFAULTS_PATH: &str = ".splinter";
 
 #[derive(Serialize, Deserialize)]
 pub struct SerdeDefaultValue {
@@ -55,11 +59,9 @@ impl Default for FileBackedDefaultStore {
     }
 }
 
-impl YamlBackedStore<SerdeDefaultValue> for FileBackedDefaultStore {}
-
 impl DefaultValueStore for FileBackedDefaultStore {
     fn set_default_value(&self, new_default_value: &DefaultValue) -> Result<(), DefaultStoreError> {
-        let mut defaults = Self::read_data_from_file(&self.file_name)?;
+        let mut defaults = self.load()?;
         let existing_default_index = defaults.iter().enumerate().find_map(|(index, default)| {
             if default.key == new_default_value.key() {
                 Some(index)
@@ -73,12 +75,12 @@ impl DefaultValueStore for FileBackedDefaultStore {
 
         defaults.push(SerdeDefaultValue::from(new_default_value));
 
-        Self::write_to_file(&self.file_name, &defaults)?;
+        self.save(&defaults)?;
 
         Ok(())
     }
     fn unset_default_value(&self, default_key: &str) -> Result<(), DefaultStoreError> {
-        let mut all_defaults = Self::read_data_from_file(&self.file_name)?;
+        let mut all_defaults = self.load()?;
 
         let key_index = all_defaults
             .iter()
@@ -93,7 +95,7 @@ impl DefaultValueStore for FileBackedDefaultStore {
 
         if let Some(index) = key_index {
             all_defaults.remove(index);
-            Self::write_to_file(&self.file_name, &all_defaults)?;
+            self.save(&all_defaults)?;
         } else {
             return Err(DefaultStoreError::NotSet(format!(
                 "Default value for {} not found",
@@ -105,7 +107,7 @@ impl DefaultValueStore for FileBackedDefaultStore {
     }
 
     fn list_default_values(&self) -> Result<Vec<DefaultValue>, DefaultStoreError> {
-        let serde_defaults = Self::read_data_from_file(&self.file_name)?;
+        let serde_defaults = self.load()?;
         let defaults = serde_defaults
             .into_iter()
             .map(|default_value| default_value.into())
@@ -114,7 +116,7 @@ impl DefaultValueStore for FileBackedDefaultStore {
     }
 
     fn get_default_value(&self, key: &str) -> Result<Option<DefaultValue>, DefaultStoreError> {
-        let defaults = Self::read_data_from_file(&self.file_name)?;
+        let defaults = self.load()?;
 
         let default_value = defaults.into_iter().find_map(|default_value| {
             if default_value.key == key {
@@ -125,4 +127,55 @@ impl DefaultValueStore for FileBackedDefaultStore {
 
         Ok(default_value)
     }
+}
+
+impl FileBackedDefaultStore {
+    fn load(&self) -> Result<Vec<SerdeDefaultValue>, DefaultStoreError> {
+        let file = open_file(false, &self.file_name)?;
+
+        if file.metadata()?.len() == 0 {
+            return Ok(vec![]);
+        }
+
+        let default_values = serde_yaml::from_reader(file)?;
+        Ok(default_values)
+    }
+
+    fn save(&self, default_values: &[SerdeDefaultValue]) -> Result<(), DefaultStoreError> {
+        let temp_file_name = format!("{}.tmp", self.file_name);
+        let file = open_file(true, &temp_file_name)?;
+
+        serde_yaml::to_writer(file, &default_values)?;
+
+        let temp_file_path = build_file_path(&temp_file_name)?;
+        let perm_file_path = build_file_path(&self.file_name)?;
+        fs::rename(temp_file_path, perm_file_path)?;
+        Ok(())
+    }
+}
+
+fn build_file_path(file_name: &str) -> Result<PathBuf, DefaultStoreError> {
+    let mut path = get_file_path()?;
+    path.push(file_name);
+    Ok(path)
+}
+
+fn open_file(truncate: bool, file_name: &str) -> Result<File, DefaultStoreError> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(truncate)
+        .open(&build_file_path(file_name)?)?;
+    Ok(file)
+}
+
+fn get_file_path() -> Result<PathBuf, DefaultStoreError> {
+    let mut path = dirs::home_dir().ok_or_else(|| {
+        let err = IoError::new(ErrorKind::NotFound, "Home directory not found");
+        DefaultStoreError::IoError(err)
+    })?;
+    path.push(DEFAULTS_PATH);
+    fs::create_dir_all(&path)?;
+    Ok(path)
 }
