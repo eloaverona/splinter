@@ -143,7 +143,11 @@ impl CreateCircuitMessageBuilder {
         });
 
         let circuit_management_type = self.circuit_management_type.ok_or_else(|| {
-            BuilderError::MissingField("Unable to build CreateCircuit message. Missing required field circuit_management_type".to_string())
+            BuilderError::MissingField(
+                "Unable to build CreateCircuit message. \
+                Missing required field circuit_management_type"
+                    .to_string(),
+            )
         })?;
 
         let application_metadata = self.application_metadata.unwrap_or_default();
@@ -226,6 +230,46 @@ impl SplinterServiceBuilder {
         };
 
         Ok(service)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct SplinterNodeBuilder {
+    node_id: Option<String>,
+    endpoint: Option<String>,
+}
+
+impl SplinterNodeBuilder {
+    pub fn new() -> Self {
+        SplinterNodeBuilder::default()
+    }
+
+    pub fn with_node_id(mut self, node_id: &str) -> SplinterNodeBuilder {
+        self.node_id = Some(node_id.into());
+        self
+    }
+
+    pub fn with_endpoint(mut self, endpoint: &str) -> SplinterNodeBuilder {
+        self.endpoint = Some(endpoint.into());
+        self
+    }
+
+    pub fn build(self) -> Result<SplinterNode, BuilderError> {
+        let node_id = self.node_id.ok_or_else(|| {
+            BuilderError::MissingField(
+                "Unable to build SplinterNode. Missing required field node_id".to_string(),
+            )
+        })?;
+
+        let endpoint = self.endpoint.ok_or_else(|| {
+            BuilderError::MissingField(
+                "Unable to build SplinterNode. Missing required field endpoint".to_string(),
+            )
+        })?;
+
+        let node = SplinterNode { node_id, endpoint };
+
+        Ok(node)
     }
 }
 
