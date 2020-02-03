@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod api;
+mod builder;
 pub mod defaults;
 mod file;
 mod payload;
@@ -24,7 +25,10 @@ use std::io::Read;
 use clap::{ArgMatches, Values};
 use regex::Regex;
 use reqwest::Url;
-use splinter::admin::messages::{CreateCircuit, SplinterNode, SplinterService, AuthorizationType, PersistenceType, DurabilityType, RouteType};
+use splinter::admin::messages::{
+    AuthorizationType, CreateCircuit, DurabilityType, PersistenceType, RouteType, SplinterNode,
+    SplinterService,
+};
 
 use crate::error::CliError;
 
@@ -66,37 +70,41 @@ impl Action for CircuitCreateAction {
 
             let mut auth_type = args.value_of("authorization_type").unwrap_or("trust");
 
-
             let mut management_type = match args.value_of("management_type") {
                 Some(val) => val.to_string(),
                 None => {
-                    match defaults::get_default_management_type()?{
-                        Some(val) => val,
-                        None => return Err(CliError::ActionError(
-                            "Management-type not provided and no default set".into(),
-                        ))
-                    }
+                    return Err(CliError::ActionError(
+                        "Management-type not provided and no default set".into(),
+                    ));
+                    // match defaults::get_default_management_type()?{
+                    //     Some(val) => val,
+                    // None => return Err(CliError::ActionError(
+                    //     "Management-type not provided and no default set".into(),
+                    // ))
+                    // }
                 }
-
             };
 
             let mut service_types = match args.values_of("service_type") {
                 Some(mut service_type) => parse_sercive_type_arg(&mut service_type)?,
                 None => {
-                    let default_val = defaults::get_default_service_type()?;
-                    match default_val {
-                        Some(val) => {
-                            let service_id_match = Regex::new(".*").map_err(|_| {
-                                CliError::ActionError("Failed to set service-type".into())
-                            })?;
-                            vec![(service_id_match, val)]
-                        }
-                        None => {
-                            return Err(CliError::ActionError(
-                                "Service-type not provided and no default set".into(),
-                            ))
-                        }
-                    }
+                    return Err(CliError::ActionError(
+                        "Service-type not provided and no default set".into(),
+                    ));
+                    //         let default_val = defaults::get_default_service_type()?;
+                    //         match default_val {
+                    //             Some(val) => {
+                    //                 let service_id_match = Regex::new(".*").map_err(|_| {
+                    //                     CliError::ActionError("Failed to set service-type".into())
+                    //                 })?;
+                    //                 vec![(service_id_match, val)]
+                    //             }
+                    //             None => {
+                    //                 return Err(CliError::ActionError(
+                    //                     "Service-type not provided and no default set".into(),
+                    //                 ))
+                    //             }
+                    //         }
                 }
             };
 
@@ -120,7 +128,7 @@ impl Action for CircuitCreateAction {
                 durability: DurabilityType::NoDurability,
                 routes: RouteType::Any,
                 circuit_management_type: management_type,
-                application_metadata: vec![]
+                application_metadata: vec![],
             };
 
             let client = api::SplinterRestClient::new(url);
@@ -275,7 +283,10 @@ fn assign_type_to_service(
     )
 }
 
-fn make_service_roster(services: &HashMap<String, Vec<(String, String)>>, service_args: &Vec<(Regex, (String, Vec<String>))> ) -> Vec<SplinterService> {
+fn make_service_roster(
+    services: &HashMap<String, Vec<(String, String)>>,
+    service_args: &Vec<(Regex, (String, Vec<String>))>,
+) -> Vec<SplinterService> {
     // services.iter().try_fold(Vec::new(), |mut acc, (service_id, allowed_nodes)| {
     //     let service_type = services_type.iter().find_map(|(service_id_match, service_type)| {
     //         let re = Regex::new(service_id_match).unwrap();
@@ -287,7 +298,6 @@ fn make_service_roster(services: &HashMap<String, Vec<(String, String)>>, servic
     //     });
     // })
     services.keys().fold(Vec::new(), |mut acc, (service_type)| {
-
         if let Some(services) = services.get(service_type) {
             let peer_services = services
                 .iter()
@@ -352,16 +362,20 @@ fn make_splinter_node(value: &str) -> Result<SplinterNode, CliError> {
                 endpoint: value.to_string(),
             })
         }
-        Err(err) => match node::get_endpoint_for_alias(value)? {
-            Some(endpoint) => Ok(SplinterNode {
-                node_id: value.to_string(),
-                endpoint: endpoint.to_string(),
-            }),
-            None => Err(CliError::ActionError(format!(
-                "Invalid node endpoint or node alias has not been set: {}",
-                value
-            ))),
-        },
+        Err(err) => Err(CliError::ActionError(format!(
+            "Invalid node endpoint or node alias has not been set: {}",
+            value
+        ))),
+        //match node::get_endpoint_for_alias(value)? {
+        //     Some(endpoint) => Ok(SplinterNode {
+        //         node_id: value.to_string(),
+        //         endpoint: endpoint.to_string(),
+        //     }),
+        //     None => Err(CliError::ActionError(format!(
+        //         "Invalid node endpoint or node alias has not been set: {}",
+        //         value
+        //     ))),
+        // },
     }
 }
 
