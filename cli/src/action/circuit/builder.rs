@@ -74,18 +74,37 @@ impl MessageBuilder {
             .collect();
     }
 
-    pub fn add_node(&mut self, node: &str) -> Result<(), String> {
-        let (node_id, endpoint) = match self
-            .node_store
-            .get_node(node)
-            .map_err(|err| err.to_string())?
-        {
-            Some(store_node) => (store_node.alias(), store_node.endpoint()),
-            None => (
-                make_node_id_from_endpoint(node).expect("Err"),
-                node.to_string(),
-            ),
+    pub fn add_node(&mut self, node_id: &str, node_endpoint: Option<String>) -> Result<(), String> {
+        let endpoint = match node_endpoint {
+            Some(endpoint) => endpoint,
+            None => {
+                match self
+                    .node_store
+                    .get_node(node_id)
+                    .map_err(|err| err.to_string())?
+                {
+                    Some(node) => node.endpoint(),
+                    None => {
+                        return Err(format!(
+                            "No endpoint provided and node alias {} has not been set",
+                            node_id
+                        ))
+                    }
+                }
+            }
         };
+
+        // let (node_id, endpoint) = match self
+        //     .node_store
+        //     .get_node(node)
+        //     .map_err(|err| err.to_string())?
+        // {
+        //     Some(store_node) => (store_node.alias(), store_node.endpoint()),
+        //     None => (
+        //         make_node_id_from_endpoint(node).expect("Err"),
+        //         node.to_string(),
+        //     ),
+        // };
 
         let node = SplinterNodeBuilder::new()
             .with_node_id(&node_id)
@@ -159,7 +178,7 @@ impl MessageBuilder {
             acc
         });
 
-        format!("{}::{}", partial_circuit_id, Uuid::new_v4().to_string())
+        Uuid::new_v4().to_string()
     }
 
     pub fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {

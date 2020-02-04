@@ -54,10 +54,10 @@ impl Action for CircuitCreateAction {
             let mut builder = MessageBuilder::new();
 
             for node in nodes {
-                builder.add_node(node);
+                let (node_id, endpoint) = parse_node_argument(node)?;
+                builder.add_node(&node_id, endpoint).expect("No nodes added");
             }
 
-    
             let mut services = match args.values_of("service") {
                 Some(mut services) => services, //parse_service_arg(&mut services)?,
                 None => return Err(CliError::ActionError("Service is required".into())),
@@ -68,13 +68,11 @@ impl Action for CircuitCreateAction {
                 builder.add_service(&service_id, &allowed_nodes);
             }
 
-
             if let Some(service_arguments) = args.values_of("service_argument") {
                 for service_argument in service_arguments {
                     let (service_id_match, argument) = parse_service_argument(service_argument)?;
                     builder.apply_service_arguments(&service_id_match, &argument);
                 }
-
             }
 
             let mut auth_type = args.value_of("authorization_type").unwrap_or("trust");
@@ -97,7 +95,6 @@ impl Action for CircuitCreateAction {
             let requester_node = client.fetch_node_id()?;
             let private_key_hex = read_private_key(key)?;
 
-
             let signed_payload =
                 payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
 
@@ -106,6 +103,19 @@ impl Action for CircuitCreateAction {
             Ok(())
         }
     }
+}
+
+fn parse_node_argument(node: &str) -> Result<(String, Option<String>), CliError> {
+    let mut iter = node.split("::");
+
+    let node_id = iter
+        .next()
+        .ok_or_else(|| CliError::ActionError(format!("node is not valid {}", node)))?
+        .to_string();
+
+    let endpoint = iter.next().map(String::from);
+
+    Ok((node_id, endpoint))
 }
 
 fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {
@@ -154,10 +164,10 @@ fn parse_service_argument(service_argument: &str) -> Result<(String, (String, St
         .ok_or_else(|| {
             CliError::ActionError(format!("service_argument not valid {}", service_argument))
         })?
-        .to_string();
+        .split(",")
+        .collect::<Vec<&str>>();
 
-    Ok((service_id, (key, value)))
-
+    Ok((service_id, (key, format!("{:?}", value))))
 }
 
 fn parse_sercive_type_argument(service_type: &str) -> Result<(String, String), CliError> {
