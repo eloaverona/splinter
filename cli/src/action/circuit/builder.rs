@@ -15,6 +15,7 @@
 use reqwest::Url;
 use uuid::Uuid;
 
+use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
 use crate::error::CliError;
 use crate::store::default_value::{DefaultValueStore, FileBackedDefaultStore};
 use crate::store::node::{FileBackedNodeStore, NodeStore};
@@ -129,7 +130,20 @@ impl MessageBuilder {
         let services = self
             .services
             .into_iter()
-            .try_fold::<_, _, Result<_, String>>(Vec::new(), |mut acc, builder| {
+            .try_fold::<_, _, Result<_, String>>(Vec::new(), |mut acc, mut builder| {
+                if builder.service_type().is_none() {
+                    let default_store = get_default_value_store();
+                    builder = match default_store
+                        .get_default_value(SERVICE_TYPE_KEY)
+                        .expect("erer")
+                    {
+                        Some(service_type) => builder.with_service_type(&service_type.value()),
+                        None => {
+                            return Err("Service has no service type and no default value is set"
+                                .to_string())
+                        }
+                    }
+                }
                 let service = builder.build().expect("Errrr");
                 acc.push(service);
                 Ok(acc)

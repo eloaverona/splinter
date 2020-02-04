@@ -181,6 +181,22 @@ impl SplinterServiceBuilder {
         SplinterServiceBuilder::default()
     }
 
+    pub fn service_id(&self) -> Option<String> {
+        self.service_id.clone()
+    }
+
+    pub fn service_type(&self) -> Option<String> {
+        self.service_type.clone()
+    }
+
+    pub fn allowed_nodes(&self) -> Option<Vec<String>> {
+        self.allowed_nodes.clone()
+    }
+
+    pub fn arguments(&self) -> Option<Vec<(String, String)>> {
+        self.arguments.clone()
+    }
+
     pub fn with_service_id(mut self, service_id: &str) -> SplinterServiceBuilder {
         self.service_id = Some(service_id.into());
         self
