@@ -20,35 +20,38 @@ use crate::store::default_value::{DefaultValueStore, FileBackedDefaultStore};
 use crate::store::node::{FileBackedNodeStore, NodeStore};
 use splinter::admin::messages::*;
 
-#[derive(Clone)]
-pub struct ServiceBuilder {
-    service_id: String,
-    service_args: Vec<(String, String)>,
-    builder: SplinterServiceBuilder,
-}
-
-impl ServiceBuilder {
-    pub fn new(service_id: &str, allowed_nodes: &[String]) -> ServiceBuilder {
-        let builder = SplinterServiceBuilder::new()
-            .with_service_id(service_id)
-            .with_allowed_nodes(allowed_nodes);
-        ServiceBuilder {
-            service_id: service_id.to_string(),
-            service_args: vec![],
-            builder,
-        }
-    }
-
-    fn build(self) -> Result<SplinterService, String> {
-        self.builder
-            .with_arguments(&self.service_args)
-            .build()
-            .map_err(|err| err.to_string())
-    }
-}
+// #[derive(Clone)]
+// pub struct ServiceBuilder {
+//     service_id: String,
+//     service_args: Vec<(String, String)>,
+//     builder: SplinterServiceBuilder,
+// }
+//
+// impl ServiceBuilder {
+//     pub fn new(service_id: &str, allowed_nodes: &[String]) -> ServiceBuilder {
+//         let builder = SplinterServiceBuilder::new()
+//             .with_service_id(service_id)
+//             .with_allowed_nodes(allowed_nodes);
+//         ServiceBuilder {
+//             service_id: service_id.to_string(),
+//             service_args: vec![],
+//             builder,
+//         }
+//     }
+//
+//     fn build(self) -> Result<SplinterService, String> {
+//         if self.builder.service_type.is_none() {
+//
+//         }
+//         self.builder
+//             .with_arguments(&self.service_args)
+//             .build()
+//             .map_err(|err| err.to_string())
+//     }
+// }
 
 pub struct MessageBuilder {
-    services: Vec<ServiceBuilder>,
+    services: Vec<SplinterServiceBuilder>,
     nodes: Vec<SplinterNode>,
     node_store: Box<dyn NodeStore>,
     default_store: Box<dyn DefaultValueStore>,
@@ -70,11 +73,12 @@ impl MessageBuilder {
             .clone()
             .into_iter()
             .map(|mut service_builder| {
-                if is_match(service_id_match, &service_builder.service_id) {
-                    service_builder.builder =
-                        service_builder.builder.with_service_type(service_type);
+                let service_id = service_builder.service_id().unwrap_or_default();
+                if is_match(service_id_match, &service_id) {
+                    service_builder.with_service_type(service_type)
+                } else {
+                    service_builder
                 }
-                service_builder
             })
             .collect();
     }
@@ -85,10 +89,14 @@ impl MessageBuilder {
             .clone()
             .into_iter()
             .map(|mut service_builder| {
-                if is_match(service_id_match, &service_builder.service_id) {
-                    service_builder.service_args.push(args.clone())
+                let service_id = service_builder.service_id().unwrap_or_default();
+                if is_match(service_id_match, &service_id) {
+                    let mut service_args = service_builder.arguments().unwrap_or_default();
+                    service_args.push(args.clone());
+                    service_builder.with_arguments(&service_args)
+                } else {
+                    service_builder
                 }
-                service_builder
             })
             .collect();
     }
@@ -122,7 +130,7 @@ impl MessageBuilder {
             .services
             .into_iter()
             .try_fold::<_, _, Result<_, String>>(Vec::new(), |mut acc, builder| {
-                let service = builder.build()?;
+                let service = builder.build().expect("Errrr");
                 acc.push(service);
                 Ok(acc)
             })?;
@@ -147,7 +155,9 @@ impl MessageBuilder {
     }
 
     fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
-        let service_builder = ServiceBuilder::new(service_id, allowed_nodes);
+        let service_builder = SplinterServiceBuilder::new()
+            .with_service_id(service_id)
+            .with_allowed_nodes(allowed_nodes);
         self.services.push(service_builder);
     }
 }
