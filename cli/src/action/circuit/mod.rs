@@ -75,55 +75,73 @@ impl Action for CircuitCreateAction {
                 builder.add_service(&service_id, &allowed_nodes);
             }
 
-            let mut service_arguments = match args.values_of("service_argument") {
-                Some(mut arguments) => arguments, //parse_service_argument(&mut arguments)?,
-                None => return Err(CliError::ActionError("Service is required".into())),
-            };
 
-            for service_argument in service_arguments {
-                let (service_id_match, argument) = parse_service_argument(service_argument)?;
-                builder.apply_service_arguments(&service_id_match, &argument);
+            if let Some(service_arguments) = args.values_of("service_argument") {
+                for service_argument in service_arguments {
+                    let (service_id_match, argument) = parse_service_argument(service_argument)?;
+                    builder.apply_service_arguments(&service_id_match, &argument);
+                }
+
             }
+            // let mut service_arguments = match args.values_of("service_argument") {
+            //     Some(mut arguments) => arguments, //parse_service_argument(&mut arguments)?,
+            //     None => return Err(CliError::ActionError("Service is required".into())),
+            // };
+            //
+            // for service_argument in service_arguments {
+            //     let (service_id_match, argument) = parse_service_argument(service_argument)?;
+            //     builder.apply_service_arguments(&service_id_match, &argument);
+            // }
 
             let mut auth_type = args.value_of("authorization_type").unwrap_or("trust");
 
-            let mut management_type = match args.value_of("management_type") {
-                Some(val) => val.to_string(),
-                None => {
-                    return Err(CliError::ActionError(
-                        "Management-type not provided and no default set".into(),
-                    ));
-                    // match defaults::get_default_management_type()?{
-                    //     Some(val) => val,
-                    // None => return Err(CliError::ActionError(
-                    //     "Management-type not provided and no default set".into(),
-                    // ))
-                    // }
-                }
-            };
+            if let Some(management_type) = args.value_of("management_type") {
+                builder.set_management_type(management_type);
+            }
+            // let mut management_type = match args.value_of("management_type") {
+            //     Some(val) => val.to_string(),
+            //     None => {
+            //         return Err(CliError::ActionError(
+            //             "Management-type not provided and no default set".into(),
+            //         ));
+            //         // match defaults::get_default_management_type()?{
+            //         //     Some(val) => val,
+            //         // None => return Err(CliError::ActionError(
+            //         //     "Management-type not provided and no default set".into(),
+            //         // ))
+            //         // }
+            //     }
+            // };
 
-            let mut service_types = match args.values_of("service_type") {
-                Some(mut service_type) => parse_sercive_type_arg(&mut service_type)?,
-                None => {
-                    return Err(CliError::ActionError(
-                        "Service-type not provided and no default set".into(),
-                    ));
-                    //         let default_val = defaults::get_default_service_type()?;
-                    //         match default_val {
-                    //             Some(val) => {
-                    //                 let service_id_match = Regex::new(".*").map_err(|_| {
-                    //                     CliError::ActionError("Failed to set service-type".into())
-                    //                 })?;
-                    //                 vec![(service_id_match, val)]
-                    //             }
-                    //             None => {
-                    //                 return Err(CliError::ActionError(
-                    //                     "Service-type not provided and no default set".into(),
-                    //                 ))
-                    //             }
-                    //         }
+            if let Some(service_types) = args.values_of("service_type") {
+                for service_type_arg in service_types {
+                    let (service_id_match, service_type) =
+                        parse_sercive_type_argument(service_type_arg)?;
+                    builder.apply_service_type(&service_id_match, &service_type);
                 }
-            };
+            }
+            // let mut service_types = match args.values_of("service_type") {
+            //     Some(mut service_type) => service_type //parse_sercive_type_arg(&mut service_type)?,
+            //     None => {
+            //         return Err(CliError::ActionError(
+            //             "Service-type not provided and no default set".into(),
+            //         ));
+            //         //         let default_val = defaults::get_default_service_type()?;
+            //         match default_val {
+            //             Some(val) => {
+            //                 let service_id_match = Regex::new(".*").map_err(|_| {
+            //                     CliError::ActionError("Failed to set service-type".into())
+            //                 })?;
+            //                 vec![(service_id_match, val)]
+            //             }
+            //             None => {
+            //                 return Err(CliError::ActionError(
+            //                     "Service-type not provided and no default set".into(),
+            //                 ))
+            //             }
+            //         }
+            //     }
+            // };
 
             // let services_with_type = assign_type_to_service(&services, &service_types)?;
             //
@@ -148,9 +166,11 @@ impl Action for CircuitCreateAction {
             //     application_metadata: vec![],
             // };
 
-            // let client = api::SplinterRestClient::new(url);
-            // let requester_node = client.fetch_node_id()?;
-            // let private_key_hex = read_private_key(key)?;
+            let create_circuit = builder.build().expect("Failed to build");
+
+            let client = api::SplinterRestClient::new(url);
+            let requester_node = client.fetch_node_id()?;
+            let private_key_hex = read_private_key(key)?;
 
             // let proposal_file = File::open(proposal_path).map_err(|err| {
             //     CliError::EnvironmentError(format!("Unable to open {}: {}", proposal_path, err))
@@ -160,10 +180,10 @@ impl Action for CircuitCreateAction {
             //     CliError::EnvironmentError(format!("Unable to parse {}: {}", proposal_path, err))
             // })?;
 
-            // let signed_payload =
-            //     payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
-            //
-            // client.submit_admin_payload(signed_payload)?;
+            let signed_payload =
+                payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
+
+            client.submit_admin_payload(signed_payload)?;
 
             //warn!("services_with_type {:?}", services_with_type);
 
@@ -304,36 +324,64 @@ fn parse_service_argument(service_argument: &str) -> Result<(String, (String, St
 //         Ok(acc)
 //     })
 // }
+fn parse_sercive_type_argument(service_type: &str) -> Result<(String, String), CliError> {
+    //service_type_values.try_fold(Vec::new(), |mut acc, val| {
+    let mut iter = service_type.split("::");
 
-fn parse_sercive_type_arg(
-    service_type_values: &mut Values,
-) -> Result<Vec<(Regex, String)>, CliError> {
-    service_type_values.try_fold(Vec::new(), |mut acc, val| {
-        let mut iter = val.split("::");
+    let service_id = iter
+        .next()
+        .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service_type)))?
+        .to_string();
 
-        let service_id = iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
+    // let re = if service_id.starts_with("*") {
+    //     Regex::new(&format!(".{}", service_id)).map_err(|_| {
+    //         CliError::ActionError(format!("service_id is not valid {}", service_id))
+    //     })
+    // } else {
+    //     Regex::new(&service_id).map_err(|_| {
+    //         CliError::ActionError(format!("service_id is not valid {}", service_id))
+    //     })
+    // }?;
 
-        let re = if service_id.starts_with("*") {
-            Regex::new(&format!(".{}", service_id)).map_err(|_| {
-                CliError::ActionError(format!("service_id is not valid {}", service_id))
-            })
-        } else {
-            Regex::new(&service_id).map_err(|_| {
-                CliError::ActionError(format!("service_id is not valid {}", service_id))
-            })
-        }?;
-
-        let service_type = iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
-        acc.push((re, service_type));
-        Ok(acc)
-    })
+    let service_type = iter
+        .next()
+        .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service_type)))?
+        .to_string();
+    Ok((service_id, service_type))
+    //     acc.push((re, service_type));
+    //     Ok(acc)
+    // })
 }
+
+// fn parse_sercive_type_arg(
+//     service_type_values: &mut Values,
+// ) -> Result<Vec<(Regex, String)>, CliError> {
+//     service_type_values.try_fold(Vec::new(), |mut acc, val| {
+//         let mut iter = val.split("::");
+//
+//         let service_id = iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
+//             .to_string();
+//
+//         let re = if service_id.starts_with("*") {
+//             Regex::new(&format!(".{}", service_id)).map_err(|_| {
+//                 CliError::ActionError(format!("service_id is not valid {}", service_id))
+//             })
+//         } else {
+//             Regex::new(&service_id).map_err(|_| {
+//                 CliError::ActionError(format!("service_id is not valid {}", service_id))
+//             })
+//         }?;
+//
+//         let service_type = iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
+//             .to_string();
+//         acc.push((re, service_type));
+//         Ok(acc)
+//     })
+// }
 
 fn assign_type_to_service(
     services: &Vec<(String, String)>,
