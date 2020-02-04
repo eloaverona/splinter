@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use reqwest::Url;
 use uuid::Uuid;
 
+use crate::error::CliError;
+use crate::store::default_value::{DefaultValueStore, FileBackedDefaultStore};
+use crate::store::node::{FileBackedNodeStore, NodeStore};
 use splinter::admin::messages::*;
 
 #[derive(Clone)]
@@ -46,9 +50,20 @@ impl ServiceBuilder {
 pub struct MessageBuilder {
     services: Vec<ServiceBuilder>,
     nodes: Vec<SplinterNode>,
+    node_store: Box<dyn NodeStore>,
+    default_store: Box<dyn DefaultValueStore>,
 }
 
 impl MessageBuilder {
+    pub fn new() -> MessageBuilder {
+        MessageBuilder {
+            services: vec![],
+            nodes: vec![],
+            node_store: Box::new(FileBackedNodeStore::default()),
+            default_store: Box::new(FileBackedDefaultStore::default()),
+        }
+    }
+
     pub fn apply_service_type(&mut self, service_id_match: &str, service_type: &str) {
         self.services = self
             .services
@@ -78,13 +93,26 @@ impl MessageBuilder {
             .collect();
     }
 
-    pub fn add_node(&mut self, node_id: &str, endpoint: &str) {
+    pub fn add_node(&mut self, node: &str) -> Result<(), String> {
+        let (node_id, endpoint) = match self
+            .node_store
+            .get_node(node)
+            .map_err(|err| err.to_string())?
+        {
+            Some(store_node) => (store_node.alias(), store_node.endpoint()),
+            None => (
+                make_node_id_from_endpoint(node).expect("Err"),
+                node.to_string(),
+            ),
+        };
+
         let node = SplinterNodeBuilder::new()
-            .with_node_id(node_id)
-            .with_endpoint(endpoint)
+            .with_node_id(&node_id)
+            .with_endpoint(&endpoint)
             .build()
             .expect("adsas");
         self.nodes.push(node);
+        Ok(())
     }
 
     pub fn build(self, management_type: &str) -> Result<CreateCircuit, String> {
@@ -117,6 +145,11 @@ impl MessageBuilder {
 
         format!("{}::{}", partial_circuit_id, Uuid::new_v4().to_string())
     }
+
+    fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
+        let service_builder = ServiceBuilder::new(service_id, allowed_nodes);
+        self.services.push(service_builder);
+    }
 }
 
 fn is_match(service_id_match: &str, service_id: &str) -> bool {
@@ -127,4 +160,54 @@ fn is_match(service_id_match: &str, service_id: &str) -> bool {
             service_id == part
         }
     })
+}
+
+fn validate_node_endpont(endpoint: &str) -> Result<(), CliError> {
+    if let Err(err) = Url::parse(endpoint) {
+        Err(CliError::ActionError(format!(
+            "{} is not a valid url: {}",
+            endpoint, err
+        )))
+    } else {
+        Ok(())
+    }
+}
+fn make_node_id_from_endpoint(endpoint: &str) -> Result<String, CliError> {
+    match Url::parse(endpoint) {
+        Ok(url) => {
+            let host = match url.host_str() {
+                Some(host) => host,
+                None => {
+                    return Err(CliError::ActionError(format!(
+                        "Invalid node endpoint: {}",
+                        endpoint
+                    )))
+                }
+            };
+            let port = match url.port_or_known_default() {
+                Some(port) => port,
+                None => {
+                    return Err(CliError::ActionError(format!(
+                        "Invalid node endpoint: {}",
+                        endpoint
+                    )))
+                }
+            };
+            Ok(format!("{}_{}", host, port))
+        }
+        Err(err) => Err(CliError::ActionError(format!(
+            "Invalid node endpoint or node alias has not been set: {}",
+            endpoint
+        ))),
+        //match node::get_endpoint_for_alias(value)? {
+        //     Some(endpoint) => Ok(SplinterNode {
+        //         node_id: value.to_string(),
+        //         endpoint: endpoint.to_string(),
+        //     }),
+        //     None => Err(CliError::ActionError(format!(
+        //         "Invalid node endpoint or node alias has not been set: {}",
+        //         value
+        //     ))),
+        // },
+    }
 }

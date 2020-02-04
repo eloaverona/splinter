@@ -33,6 +33,7 @@ use splinter::admin::messages::{
 use crate::error::CliError;
 
 use super::Action;
+use builder::MessageBuilder;
 
 pub struct CircuitCreateAction;
 
@@ -50,6 +51,8 @@ impl Action for CircuitCreateAction {
                 Some(nodes) => nodes,
                 None => return Err(CliError::ActionError("Path is required".into())),
             };
+
+            let mut builder = MessageBuilder::new();
 
             let members: Result<Vec<SplinterNode>, CliError> =
                 nodes.try_fold(Vec::new(), |mut acc, node| {
