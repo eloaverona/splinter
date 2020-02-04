@@ -21,36 +21,6 @@ use crate::store::default_value::{DefaultValueStore, FileBackedDefaultStore};
 use crate::store::node::{FileBackedNodeStore, NodeStore};
 use splinter::admin::messages::*;
 
-// #[derive(Clone)]
-// pub struct ServiceBuilder {
-//     service_id: String,
-//     service_args: Vec<(String, String)>,
-//     builder: SplinterServiceBuilder,
-// }
-//
-// impl ServiceBuilder {
-//     pub fn new(service_id: &str, allowed_nodes: &[String]) -> ServiceBuilder {
-//         let builder = SplinterServiceBuilder::new()
-//             .with_service_id(service_id)
-//             .with_allowed_nodes(allowed_nodes);
-//         ServiceBuilder {
-//             service_id: service_id.to_string(),
-//             service_args: vec![],
-//             builder,
-//         }
-//     }
-//
-//     fn build(self) -> Result<SplinterService, String> {
-//         if self.builder.service_type.is_none() {
-//
-//         }
-//         self.builder
-//             .with_arguments(&self.service_args)
-//             .build()
-//             .map_err(|err| err.to_string())
-//     }
-// }
-
 pub struct MessageBuilder {
     services: Vec<SplinterServiceBuilder>,
     nodes: Vec<SplinterNode>,
@@ -247,15 +217,5 @@ fn make_node_id_from_endpoint(endpoint: &str) -> Result<String, CliError> {
             "Invalid node endpoint or node alias has not been set: {}",
             endpoint
         ))),
-        //match node::get_endpoint_for_alias(value)? {
-        //     Some(endpoint) => Ok(SplinterNode {
-        //         node_id: value.to_string(),
-        //         endpoint: endpoint.to_string(),
-        //     }),
-        //     None => Err(CliError::ActionError(format!(
-        //         "Invalid node endpoint or node alias has not been set: {}",
-        //         value
-        //     ))),
-        // },
     }
 }

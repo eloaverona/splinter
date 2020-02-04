@@ -57,13 +57,7 @@ impl Action for CircuitCreateAction {
                 builder.add_node(node);
             }
 
-            // let members: Result<Vec<SplinterNode>, CliError> =
-            //     nodes.try_fold(Vec::new(), |mut acc, node| {
-            //         let splinter_node = make_splinter_node(&node)?;
-            //         acc.push(splinter_node);
-            //         Ok(acc)
-            //     });
-
+    
             let mut services = match args.values_of("service") {
                 Some(mut services) => services, //parse_service_arg(&mut services)?,
                 None => return Err(CliError::ActionError("Service is required".into())),
