@@ -54,6 +54,7 @@ use splinter::admin::messages::*;
 pub struct MessageBuilder {
     services: Vec<SplinterServiceBuilder>,
     nodes: Vec<SplinterNode>,
+    management_type: Option<String>,
     node_store: Box<dyn NodeStore>,
     default_store: Box<dyn DefaultValueStore>,
 }
@@ -63,6 +64,7 @@ impl MessageBuilder {
         MessageBuilder {
             services: vec![],
             nodes: vec![],
+            management_type: None,
             node_store: Box::new(FileBackedNodeStore::default()),
             default_store: Box::new(FileBackedDefaultStore::default()),
         }
@@ -124,15 +126,30 @@ impl MessageBuilder {
         Ok(())
     }
 
-    pub fn build(self, management_type: &str) -> Result<CreateCircuit, String> {
+    pub fn set_management_type(&mut self, management_type: &str) {
+        self.management_type = Some(management_type.into())
+    }
+
+    pub fn build(self) -> Result<CreateCircuit, String> {
         let circuit_id = self.make_circuit_id();
+        let default_store = get_default_value_store();
+
+        let management_type = match self.management_type  {
+            Some(management_type) => management_type,
+            None => {
+                match default_store.get_default_value(MANAGEMENT_TYPE_KEY).expect("err") {
+                    Some(management_type) => management_type.value(),
+                    None => return Err("Management type not provided and no default value set".to_string())
+                }
+            }
+        };
 
         let services = self
             .services
             .into_iter()
             .try_fold::<_, _, Result<_, String>>(Vec::new(), |mut acc, mut builder| {
                 if builder.service_type().is_none() {
-                    let default_store = get_default_value_store();
+                    //let default_store = get_default_value_store();
                     builder = match default_store
                         .get_default_value(SERVICE_TYPE_KEY)
                         .expect("erer")
@@ -153,7 +170,7 @@ impl MessageBuilder {
             .with_circuit_id(&circuit_id)
             .with_members(&self.nodes)
             .with_roster(&services)
-            .with_circuit_management_type(management_type)
+            .with_circuit_management_type(&management_type)
             .build()
             .map_err(|err| err.to_string())?;
         Ok(create_circuit)
