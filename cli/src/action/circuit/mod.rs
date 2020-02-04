@@ -54,22 +54,36 @@ impl Action for CircuitCreateAction {
 
             let mut builder = MessageBuilder::new();
 
-            let members: Result<Vec<SplinterNode>, CliError> =
-                nodes.try_fold(Vec::new(), |mut acc, node| {
-                    let splinter_node = make_splinter_node(&node)?;
-                    acc.push(splinter_node);
-                    Ok(acc)
-                });
+            for node in nodes {
+                builder.add_node(node);
+            }
+
+            // let members: Result<Vec<SplinterNode>, CliError> =
+            //     nodes.try_fold(Vec::new(), |mut acc, node| {
+            //         let splinter_node = make_splinter_node(&node)?;
+            //         acc.push(splinter_node);
+            //         Ok(acc)
+            //     });
 
             let mut services = match args.values_of("service") {
-                Some(mut services) => parse_service_arg(&mut services)?,
+                Some(mut services) => services, //parse_service_arg(&mut services)?,
                 None => return Err(CliError::ActionError("Service is required".into())),
             };
 
-            let mut service_argument = match args.values_of("service_argument") {
-                Some(mut arguments) => parse_service_argument(&mut arguments)?,
+            for service in services {
+                let (service_id, allowed_nodes) = parse_service(service)?;
+                builder.add_service(&service_id, &allowed_nodes);
+            }
+
+            let mut service_arguments = match args.values_of("service_argument") {
+                Some(mut arguments) => arguments, //parse_service_argument(&mut arguments)?,
                 None => return Err(CliError::ActionError("Service is required".into())),
             };
+
+            for service_argument in service_arguments {
+                let (service_id_match, argument) = parse_service_argument(service_argument)?;
+                builder.apply_service_arguments(&service_id_match, &argument);
+            }
 
             let mut auth_type = args.value_of("authorization_type").unwrap_or("trust");
 
@@ -111,32 +125,32 @@ impl Action for CircuitCreateAction {
                 }
             };
 
-            let services_with_type = assign_type_to_service(&services, &service_types)?;
+            // let services_with_type = assign_type_to_service(&services, &service_types)?;
+            //
+            // let splinter_services = make_service_roster(&services_with_type, &service_argument);
+            // warn!("nodes {:?}", members);
+            // warn!("service_types {:?}", service_types);
+            // warn!("services {:?}", splinter_services);
+            // warn!("services_with_type {:?}", services_with_type);
+            // warn!("service_argument {:?}", service_argument);
+            // warn!("management_type {:?}", management_type);
+            // warn!("auth_type {:?}", auth_type);
+            //
+            // let create_circuit = CreateCircuit {
+            //     circuit_id: "adasda".to_string(),
+            //     roster: splinter_services,
+            //     members: members?,
+            //     authorization_type: AuthorizationType::Trust,
+            //     persistence: PersistenceType::Any,
+            //     durability: DurabilityType::NoDurability,
+            //     routes: RouteType::Any,
+            //     circuit_management_type: management_type,
+            //     application_metadata: vec![],
+            // };
 
-            let splinter_services = make_service_roster(&services_with_type, &service_argument);
-            warn!("nodes {:?}", members);
-            warn!("service_types {:?}", service_types);
-            warn!("services {:?}", splinter_services);
-            warn!("services_with_type {:?}", services_with_type);
-            warn!("service_argument {:?}", service_argument);
-            warn!("management_type {:?}", management_type);
-            warn!("auth_type {:?}", auth_type);
-
-            let create_circuit = CreateCircuit {
-                circuit_id: "adasda".to_string(),
-                roster: splinter_services,
-                members: members?,
-                authorization_type: AuthorizationType::Trust,
-                persistence: PersistenceType::Any,
-                durability: DurabilityType::NoDurability,
-                routes: RouteType::Any,
-                circuit_management_type: management_type,
-                application_metadata: vec![],
-            };
-
-            let client = api::SplinterRestClient::new(url);
-            let requester_node = client.fetch_node_id()?;
-            let private_key_hex = read_private_key(key)?;
+            // let client = api::SplinterRestClient::new(url);
+            // let requester_node = client.fetch_node_id()?;
+            // let private_key_hex = read_private_key(key)?;
 
             // let proposal_file = File::open(proposal_path).map_err(|err| {
             //     CliError::EnvironmentError(format!("Unable to open {}: {}", proposal_path, err))
@@ -146,10 +160,10 @@ impl Action for CircuitCreateAction {
             //     CliError::EnvironmentError(format!("Unable to parse {}: {}", proposal_path, err))
             // })?;
 
-            let signed_payload =
-                payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
-
-            client.submit_admin_payload(signed_payload)?;
+            // let signed_payload =
+            //     payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
+            //
+            // client.submit_admin_payload(signed_payload)?;
 
             //warn!("services_with_type {:?}", services_with_type);
 
@@ -158,64 +172,138 @@ impl Action for CircuitCreateAction {
     }
 }
 
-fn parse_service_arg(service_type_values: &mut Values) -> Result<Vec<(String, String)>, CliError> {
-    service_type_values.try_fold(Vec::new(), |mut acc, val| {
-        let mut iter = val.split("::");
+// fn parse_service_arg(service_type_values: &mut Values) -> Result<Vec<(String, Vec<String>)>, CliError> {
+//     service_type_values.try_fold(Vec::new(), |mut acc, val| {
+//         let mut iter = val.split("::");
+//
+//         let service_id = iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
+//             .to_string();
+//
+//         let allowed_nodes = iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("allowed nodes not valid {}", val)))?
+//             .split(",")
+//             .map(String::from)
+//             .collect::<Vec<String>>();
+//         acc.push((service_id, allowed_nodes));
+//         Ok(acc)
+//     })
+// }
 
-        let service_id = iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
+fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {
+    //service_type_values.try_fold(Vec::new(), |mut acc, val| {
+    let mut iter = service.split("::");
 
-        let service_type = iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
-        acc.push((service_id, service_type));
-        Ok(acc)
-    })
+    let service_id = iter
+        .next()
+        .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service)))?
+        .to_string();
+
+    let allowed_nodes = iter
+        .next()
+        .ok_or_else(|| CliError::ActionError(format!("allowed nodes not valid {}", service)))?
+        .split(",")
+        .map(String::from)
+        .collect::<Vec<String>>();
+
+    Ok((service_id, allowed_nodes))
+    //     acc.push((service_id, allowed_nodes));
+    //     Ok(acc)
+    // })
 }
 
-fn parse_service_argument(
-    service_arguments_values: &mut Values,
-) -> Result<Vec<(Regex, (String, Vec<String>))>, CliError> {
-    service_arguments_values.try_fold(Vec::new(), |mut acc, val| {
-        let mut iter = val.split("::");
+fn parse_service_argument(service_argument: &str) -> Result<(String, (String, String)), CliError> {
+    //service_arguments_values.try_fold(Vec::new(), |mut acc, val| {
+    let mut iter = service_argument.split("::");
 
-        let service_id = iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
+    let service_id = iter
+        .next()
+        .ok_or_else(|| {
+            CliError::ActionError(format!("service_argument not valid {}", service_argument))
+        })?
+        .to_string();
 
-        let re = if service_id.starts_with("*") {
-            Regex::new(&format!(".{}", service_id)).map_err(|_| {
-                CliError::ActionError(format!("service_id is not valid {}", service_id))
-            })
-        } else {
-            Regex::new(&service_id).map_err(|_| {
-                CliError::ActionError(format!("service_id is not valid {}", service_id))
-            })
-        }?;
+    // let re = if service_id.starts_with("*") {
+    //     Regex::new(&format!(".{}", service_id)).map_err(|_| {
+    //         CliError::ActionError(format!("service_id is not valid {}", service_id))
+    //     })
+    // } else {
+    //     Regex::new(&service_id).map_err(|_| {
+    //         CliError::ActionError(format!("service_id is not valid {}", service_id))
+    //     })
+    // }?;
 
-        let arguments = iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
-        let mut argument_iter = arguments.split("=");
-        let key = argument_iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .to_string();
-        let value = argument_iter
-            .next()
-            .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", val)))?
-            .split(",")
-            .map(String::from)
-            .collect();
-        acc.push((re, (key, value)));
-        Ok(acc)
-    })
+    let arguments = iter
+        .next()
+        .ok_or_else(|| {
+            CliError::ActionError(format!("service_argument not valid {}", service_argument))
+        })?
+        .to_string();
+    let mut argument_iter = arguments.split("=");
+    let key = argument_iter
+        .next()
+        .ok_or_else(|| {
+            CliError::ActionError(format!("service_argument not valid {}", service_argument))
+        })?
+        .to_string();
+    let value = argument_iter
+        .next()
+        .ok_or_else(|| {
+            CliError::ActionError(format!("service_argument not valid {}", service_argument))
+        })?
+        .to_string();
+    // .split(",")
+    // .map(String::from)
+    // .collect();
+    Ok((service_id, (key, value)))
+    //     acc.push((service_id, (key, value)));
+    //     Ok(acc)
+    // })
 }
+
+// fn parse_service_argument(
+//     service_arguments_values: &mut Values,
+// ) -> Result<Vec<(String, (String, String))>, CliError> {
+//     service_arguments_values.try_fold(Vec::new(), |mut acc, val| {
+//         let mut iter = val.split("::");
+//
+//         let service_id = iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_argument not valid {}", val)))?
+//             .to_string();
+//
+//         // let re = if service_id.starts_with("*") {
+//         //     Regex::new(&format!(".{}", service_id)).map_err(|_| {
+//         //         CliError::ActionError(format!("service_id is not valid {}", service_id))
+//         //     })
+//         // } else {
+//         //     Regex::new(&service_id).map_err(|_| {
+//         //         CliError::ActionError(format!("service_id is not valid {}", service_id))
+//         //     })
+//         // }?;
+//
+//         let arguments = iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_argument not valid {}", val)))?
+//             .to_string();
+//         let mut argument_iter = arguments.split("=");
+//         let key = argument_iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_argument not valid {}", val)))?
+//             .to_string();
+//         let value = argument_iter
+//             .next()
+//             .ok_or_else(|| CliError::ActionError(format!("service_argument not valid {}", val)))?
+//             .to_string();
+//             // .split(",")
+//             // .map(String::from)
+//             // .collect();
+//         acc.push((service_id, (key, value)));
+//         Ok(acc)
+//     })
+// }
 
 fn parse_sercive_type_arg(
     service_type_values: &mut Values,

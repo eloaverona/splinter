@@ -134,12 +134,19 @@ impl MessageBuilder {
         let circuit_id = self.make_circuit_id();
         let default_store = get_default_value_store();
 
-        let management_type = match self.management_type  {
+        let management_type = match self.management_type {
             Some(management_type) => management_type,
             None => {
-                match default_store.get_default_value(MANAGEMENT_TYPE_KEY).expect("err") {
+                match default_store
+                    .get_default_value(MANAGEMENT_TYPE_KEY)
+                    .expect("err")
+                {
                     Some(management_type) => management_type.value(),
-                    None => return Err("Management type not provided and no default value set".to_string())
+                    None => {
+                        return Err(
+                            "Management type not provided and no default value set".to_string()
+                        )
+                    }
                 }
             }
         };
@@ -185,7 +192,7 @@ impl MessageBuilder {
         format!("{}::{}", partial_circuit_id, Uuid::new_v4().to_string())
     }
 
-    fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
+    pub fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
         let service_builder = SplinterServiceBuilder::new()
             .with_service_id(service_id)
             .with_allowed_nodes(allowed_nodes);
