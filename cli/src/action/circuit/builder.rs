@@ -80,28 +80,7 @@ impl CreateCircuitMessageBuilder {
         node_id: &str,
         node_endpoint: Option<String>,
     ) -> Result<(), CliError> {
-        let node_store = get_node_store();
-        let endpoint = match node_endpoint {
-            Some(endpoint) => endpoint,
-            None => match node_store.get_node(node_id)? {
-                Some(node) => node.endpoint(),
-                None => {
-                    return Err(CliError::ActionError(format!(
-                        "No endpoint provided and an alias for node {} has not been set",
-                        node_id
-                    )))
-                }
-            },
-        };
-
-        let node = SplinterNodeBuilder::new()
-            .with_node_id(&node_id)
-            .with_endpoint(&endpoint)
-            .build()
-            .map_err(|err| {
-                CliError::ActionError(format!("Failed to build SplinterNode: {}", err))
-            })?;
-
+        let node = make_splinter_node(node_id, node_endpoint)?;
         self.nodes.push(node);
         Ok(())
     }
@@ -130,9 +109,10 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn build(mut self) -> Result<CreateCircuit, CliError> {
-        let circuit_id = self.make_circuit_id();
+        let circuit_id = make_circuit_id();
         let default_store = get_default_value_store();
 
+        // if management type is not set check for default value
         let management_type = match self.management_type {
             Some(management_type) => management_type,
             None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
@@ -145,32 +125,44 @@ impl CreateCircuitMessageBuilder {
             },
         };
 
+        let mut nodes = self.nodes.clone();
 
-        let services = self
-            .services
-            .into_iter()
-            .try_fold(Vec::new(), |mut acc, mut builder| {
-                if builder.service_type().is_none() {
-                    builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
-                        Some(service_type) => builder.with_service_type(&service_type.value()),
-                        None => {
-                            return Err(CliError::ActionError(
-                                "Service has no service type and no default value is set"
-                                    .to_string(),
-                            ))
+        let services =
+            self.services
+                .into_iter()
+                .try_fold(Vec::new(), |mut services, mut builder| {
+                    // Check for any allowed nodes that have not been explicitly added to the
+                    // circuit definition yet
+                    for node_id in builder.allowed_nodes().unwrap_or_default().iter() {
+                        if nodes.iter().find(|node| &node.node_id == node_id).is_none() {
+                            let node = make_splinter_node(node_id, None)?;
+                            nodes.push(node)
                         }
                     }
-                }
-                let service = builder.build().map_err(|err| {
-                    CliError::ActionError(format!("Failed to build service: {}", err))
+
+                    // if service type is not set, check for default value
+                    if builder.service_type().is_none() {
+                        builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
+                            Some(service_type) => builder.with_service_type(&service_type.value()),
+                            None => {
+                                return Err(CliError::ActionError(
+                                    "Service has no service type and no default value is set"
+                                        .to_string(),
+                                ))
+                            }
+                        }
+                    }
+
+                    let service = builder.build().map_err(|err| {
+                        CliError::ActionError(format!("Failed to build service: {}", err))
+                    })?;
+                    services.push(service);
+                    Ok(services)
                 })?;
-                acc.push(service);
-                Ok(acc)
-            })?;
 
         let mut create_circuit_builder = CreateCircuitBuilder::new()
             .with_circuit_id(&circuit_id)
-            .with_members(&self.nodes)
+            .with_members(&nodes)
             .with_roster(&services)
             .with_application_metadata(&self.application_metadata)
             .with_circuit_management_type(&management_type);
@@ -184,10 +176,6 @@ impl CreateCircuitMessageBuilder {
             CliError::ActionError(format!("Failed to build CreateCircuit message: {}", err))
         })?;
         Ok(create_circuit)
-    }
-
-    fn make_circuit_id(&self) -> String {
-        Uuid::new_v4().to_string()
     }
 
     pub fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
@@ -206,4 +194,34 @@ fn is_match(service_id_match: &str, service_id: &str) -> bool {
             service_id == part
         }
     })
+}
+
+fn make_splinter_node(
+    node_id: &str,
+    node_endpoint: Option<String>,
+) -> Result<SplinterNode, CliError> {
+    let node_store = get_node_store();
+    let endpoint = match node_endpoint {
+        Some(endpoint) => endpoint,
+        None => match node_store.get_node(node_id)? {
+            Some(node) => node.endpoint(),
+            None => {
+                return Err(CliError::ActionError(format!(
+                    "No endpoint provided and an alias for node {} has not been set",
+                    node_id
+                )))
+            }
+        },
+    };
+
+    let node = SplinterNodeBuilder::new()
+        .with_node_id(&node_id)
+        .with_endpoint(&endpoint)
+        .build()
+        .map_err(|err| CliError::ActionError(format!("Failed to build SplinterNode: {}", err)))?;
+    Ok(node)
+}
+
+fn make_circuit_id() -> String {
+    Uuid::new_v4().to_string()
 }

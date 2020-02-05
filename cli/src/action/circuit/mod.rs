@@ -39,15 +39,12 @@ impl Action for CircuitCreateAction {
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
-        let nodes = match args.values_of("node") {
-            Some(nodes) => nodes,
-            None => return Err(CliError::ActionError("Path is required".into())),
+        if let Some(nodes) = args.values_of("node") {
+            for node in nodes {
+                let (node_id, endpoint) = parse_node_argument(node)?;
+                builder.add_node(&node_id, endpoint)?;
+            }
         };
-
-        for node in nodes {
-            let (node_id, endpoint) = parse_node_argument(node)?;
-            builder.add_node(&node_id, endpoint)?;
-        }
 
         let services = match args.values_of("service") {
             Some(services) => services,
