@@ -129,7 +129,7 @@ impl CreateCircuitMessageBuilder {
         self.application_metadata = application_metadata.into();
     }
 
-    pub fn build(self) -> Result<CreateCircuit, CliError> {
+    pub fn build(mut self) -> Result<CreateCircuit, CliError> {
         let circuit_id = self.make_circuit_id();
         let default_store = get_default_value_store();
 
@@ -145,10 +145,11 @@ impl CreateCircuitMessageBuilder {
             },
         };
 
+
         let services = self
             .services
             .into_iter()
-            .try_fold::<_, _, Result<_, CliError>>(Vec::new(), |mut acc, mut builder| {
+            .try_fold(Vec::new(), |mut acc, mut builder| {
                 if builder.service_type().is_none() {
                     builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
                         Some(service_type) => builder.with_service_type(&service_type.value()),
