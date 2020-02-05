@@ -18,4 +18,6 @@ pub use super::service::messages::{
     VoteRecord,
 };
 
-pub use super::service::builders::*;
+pub use super::service::messages::builders::{
+    CreateCircuitBuilder, SplinterNodeBuilder, SplinterServiceBuilder,
+};
