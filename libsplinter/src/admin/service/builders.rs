@@ -33,6 +33,42 @@ impl CreateCircuitBuilder {
         CreateCircuitBuilder::default()
     }
 
+    pub fn circuit_id(&self) -> Option<String> {
+        self.circuit_id.clone()
+    }
+
+    pub fn roster(&self) -> Option<Vec<SplinterService>> {
+        self.roster.clone()
+    }
+
+    pub fn members(&self) -> Option<Vec<SplinterNode>> {
+        self.members.clone()
+    }
+
+    pub fn authorization_type(&self) -> Option<AuthorizationType> {
+        self.authorization_type.clone()
+    }
+
+    pub fn persistence(&self) -> Option<PersistenceType> {
+        self.persistence.clone()
+    }
+
+    pub fn durability(&self) -> Option<DurabilityType> {
+        self.durability.clone()
+    }
+
+    pub fn routes(&self) -> Option<RouteType> {
+        self.routes.clone()
+    }
+
+    pub fn circuit_management_type(&self) -> Option<String> {
+        self.circuit_management_type.clone()
+    }
+
+    pub fn application_metadata(&self) -> Option<Vec<u8>> {
+        self.application_metadata.clone()
+    }
+
     pub fn with_circuit_id(mut self, circuit_id: &str) -> CreateCircuitBuilder {
         self.circuit_id = Some(circuit_id.into());
         self
@@ -56,10 +92,7 @@ impl CreateCircuitBuilder {
         self
     }
 
-    pub fn with_persistence(
-        mut self,
-        persistence: &PersistenceType,
-    ) -> CreateCircuitBuilder {
+    pub fn with_persistence(mut self, persistence: &PersistenceType) -> CreateCircuitBuilder {
         self.persistence = Some(persistence.clone());
         self
     }
@@ -260,6 +293,14 @@ impl SplinterNodeBuilder {
         SplinterNodeBuilder::default()
     }
 
+    pub fn node_id(&self) -> Option<String> {
+        self.node_id.clone()
+    }
+
+    pub fn endpoint(&self) -> Option<String> {
+        self.endpoint.clone()
+    }
+
     pub fn with_node_id(mut self, node_id: &str) -> SplinterNodeBuilder {
         self.node_id = Some(node_id.into());
         self
@@ -292,9 +333,6 @@ impl SplinterNodeBuilder {
 #[derive(Debug)]
 pub enum BuilderError {
     MissingField(String),
-    SerializationError(String),
-    DeserializationError(String),
-    SigningError(String),
 }
 
 impl StdError for BuilderError {}
@@ -303,9 +341,6 @@ impl std::fmt::Display for BuilderError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             BuilderError::MissingField(ref s) => write!(f, "MissingField: {}", s),
-            BuilderError::SerializationError(ref s) => write!(f, "SerializationError: {}", s),
-            BuilderError::DeserializationError(ref s) => write!(f, "DeserializationError: {}", s),
-            BuilderError::SigningError(ref s) => write!(f, "SigningError: {}", s),
         }
     }
 }
