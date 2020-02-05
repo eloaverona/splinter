@@ -25,6 +25,8 @@ pub struct MessageBuilder {
     services: Vec<SplinterServiceBuilder>,
     nodes: Vec<SplinterNode>,
     management_type: Option<String>,
+    authorization_type: Option<AuthorizationType>,
+    application_metadata: Vec<u8>,
     node_store: Box<dyn NodeStore>,
     default_store: Box<dyn DefaultValueStore>,
 }
@@ -35,6 +37,8 @@ impl MessageBuilder {
             services: vec![],
             nodes: vec![],
             management_type: None,
+            authorization_type: None,
+            application_metadata: vec![],
             node_store: Box::new(FileBackedNodeStore::default()),
             default_store: Box::new(FileBackedDefaultStore::default()),
         }
@@ -94,18 +98,6 @@ impl MessageBuilder {
             }
         };
 
-        // let (node_id, endpoint) = match self
-        //     .node_store
-        //     .get_node(node)
-        //     .map_err(|err| err.to_string())?
-        // {
-        //     Some(store_node) => (store_node.alias(), store_node.endpoint()),
-        //     None => (
-        //         make_node_id_from_endpoint(node).expect("Err"),
-        //         node.to_string(),
-        //     ),
-        // };
-
         let node = SplinterNodeBuilder::new()
             .with_node_id(&node_id)
             .with_endpoint(&endpoint)
@@ -116,7 +108,21 @@ impl MessageBuilder {
     }
 
     pub fn set_management_type(&mut self, management_type: &str) {
-        self.management_type = Some(management_type.into())
+        self.management_type = Some(management_type.into());
+    }
+
+    pub fn set_authorization_type(&mut self, authorization_type: &str) -> Result<(), String> {
+        let auth_type = match authorization_type {
+            "trust" => AuthorizationType::Trust,
+            _ => return Err(format!("Invalid authorization type {}", authorization_type)),
+        };
+
+        self.authorization_type = Some(auth_type);
+        Ok(())
+    }
+
+    pub fn set_application_metadata(&mut self, application_metadata: &[u8]) {
+        self.application_metadata = application_metadata.into();
     }
 
     pub fn build(self) -> Result<CreateCircuit, String> {
@@ -162,11 +168,19 @@ impl MessageBuilder {
                 Ok(acc)
             })?;
 
-        let create_circuit = CreateCircuitMessageBuilder::new()
+        let mut create_circuit_builder = CreateCircuitMessageBuilder::new()
             .with_circuit_id(&circuit_id)
             .with_members(&self.nodes)
             .with_roster(&services)
-            .with_circuit_management_type(&management_type)
+            .with_application_metadata(&self.application_metadata)
+            .with_circuit_management_type(&management_type);
+
+        if let Some(authorization_type) = self.authorization_type {
+            create_circuit_builder =
+                create_circuit_builder.with_authorization_type(&authorization_type);
+        }
+
+        let create_circuit = create_circuit_builder
             .build()
             .map_err(|err| err.to_string())?;
         Ok(create_circuit)

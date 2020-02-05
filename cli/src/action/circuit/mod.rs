@@ -55,11 +55,13 @@ impl Action for CircuitCreateAction {
 
             for node in nodes {
                 let (node_id, endpoint) = parse_node_argument(node)?;
-                builder.add_node(&node_id, endpoint).expect("No nodes added");
+                builder
+                    .add_node(&node_id, endpoint)
+                    .expect("No nodes added");
             }
 
             let mut services = match args.values_of("service") {
-                Some(mut services) => services, //parse_service_arg(&mut services)?,
+                Some(mut services) => services,
                 None => return Err(CliError::ActionError("Service is required".into())),
             };
 
@@ -75,10 +77,18 @@ impl Action for CircuitCreateAction {
                 }
             }
 
-            let mut auth_type = args.value_of("authorization_type").unwrap_or("trust");
+            if let Some(auth_type) = args.value_of("authorization_type") {
+                builder
+                    .set_authorization_type(auth_type)
+                    .expect("err aith type");
+            }
 
             if let Some(management_type) = args.value_of("management_type") {
                 builder.set_management_type(management_type);
+            }
+
+            if let Some(application_metadata) = args.value_of("application_metadata") {
+                builder.set_application_metadata(application_metadata.as_bytes());
             }
 
             if let Some(service_types) = args.values_of("service_type") {

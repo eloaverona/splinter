@@ -232,6 +232,7 @@ fn run() -> Result<(), CliError> {
                         .arg(
                             Arg::with_name("authorization_type")
                                 .long("auth-type")
+                                .possible_values(&["trust"])
                                 .takes_value(true)
                                 .help("Authorization type for a service. Default trust"),
                         )
@@ -240,9 +241,13 @@ fn run() -> Result<(), CliError> {
                                 .long("service-type")
                                 .takes_value(true)
                                 .multiple(true)
-                                //.min_values(2)
-                                //.required(true)
                                 .help("Service type for a service. Format <service-id>::<service_type>"),
+                        )
+                        .arg(
+                            Arg::with_name("application_metadata")
+                                .long("application-metadata")
+                                .takes_value(true)
+                                .help("Application metadata for the circuit proposal"),
                         ),
                 )
                 .subcommand(
