@@ -193,18 +193,10 @@ fn run() -> Result<(), CliError> {
                                 .help("Path to private key file"),
                         )
                         .arg(
-                            Arg::with_name("path")
-                                .long("path")
-                                .takes_value(true)
-                                //.required(true)
-                                .help("Path to a yaml file that defines the circuit proposal"),
-                        )
-                        .arg(
                             Arg::with_name("node")
                                 .long("node")
                                 .takes_value(true)
                                 .multiple(true)
-                                //.required(true)
                                 .help("Node that part of the circuit, accepts node alias if set or node enpoint"),
                         )
                         .arg(

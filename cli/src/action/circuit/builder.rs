@@ -12,35 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use reqwest::Url;
 use uuid::Uuid;
 
+use super::super::node::get_node_store;
 use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
+
 use crate::error::CliError;
-use crate::store::default_value::{DefaultValueStore, FileBackedDefaultStore};
-use crate::store::node::{FileBackedNodeStore, NodeStore};
+use crate::store::default_value::DefaultValueStore;
+use crate::store::node::NodeStore;
 use splinter::admin::messages::*;
 
-pub struct MessageBuilder {
+pub struct CreateCircuitMessageBuilder {
     services: Vec<SplinterServiceBuilder>,
     nodes: Vec<SplinterNode>,
     management_type: Option<String>,
     authorization_type: Option<AuthorizationType>,
     application_metadata: Vec<u8>,
-    node_store: Box<dyn NodeStore>,
-    default_store: Box<dyn DefaultValueStore>,
 }
 
-impl MessageBuilder {
-    pub fn new() -> MessageBuilder {
-        MessageBuilder {
+impl CreateCircuitMessageBuilder {
+    pub fn new() -> CreateCircuitMessageBuilder {
+        CreateCircuitMessageBuilder {
             services: vec![],
             nodes: vec![],
             management_type: None,
             authorization_type: None,
             application_metadata: vec![],
-            node_store: Box::new(FileBackedNodeStore::default()),
-            default_store: Box::new(FileBackedDefaultStore::default()),
         }
     }
 
@@ -49,7 +46,7 @@ impl MessageBuilder {
             .services
             .clone()
             .into_iter()
-            .map(|mut service_builder| {
+            .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     service_builder.with_service_type(service_type)
@@ -65,7 +62,7 @@ impl MessageBuilder {
             .services
             .clone()
             .into_iter()
-            .map(|mut service_builder| {
+            .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
@@ -78,31 +75,33 @@ impl MessageBuilder {
             .collect();
     }
 
-    pub fn add_node(&mut self, node_id: &str, node_endpoint: Option<String>) -> Result<(), String> {
+    pub fn add_node(
+        &mut self,
+        node_id: &str,
+        node_endpoint: Option<String>,
+    ) -> Result<(), CliError> {
+        let node_store = get_node_store();
         let endpoint = match node_endpoint {
             Some(endpoint) => endpoint,
-            None => {
-                match self
-                    .node_store
-                    .get_node(node_id)
-                    .map_err(|err| err.to_string())?
-                {
-                    Some(node) => node.endpoint(),
-                    None => {
-                        return Err(format!(
-                            "No endpoint provided and node alias {} has not been set",
-                            node_id
-                        ))
-                    }
+            None => match node_store.get_node(node_id)? {
+                Some(node) => node.endpoint(),
+                None => {
+                    return Err(CliError::ActionError(format!(
+                        "No endpoint provided and an alias for node {} has not been set",
+                        node_id
+                    )))
                 }
-            }
+            },
         };
 
         let node = SplinterNodeBuilder::new()
             .with_node_id(&node_id)
             .with_endpoint(&endpoint)
             .build()
-            .expect("adsas");
+            .map_err(|err| {
+                CliError::ActionError(format!("Failed to build SplinterNode: {}", err))
+            })?;
+
         self.nodes.push(node);
         Ok(())
     }
@@ -111,10 +110,15 @@ impl MessageBuilder {
         self.management_type = Some(management_type.into());
     }
 
-    pub fn set_authorization_type(&mut self, authorization_type: &str) -> Result<(), String> {
+    pub fn set_authorization_type(&mut self, authorization_type: &str) -> Result<(), CliError> {
         let auth_type = match authorization_type {
             "trust" => AuthorizationType::Trust,
-            _ => return Err(format!("Invalid authorization type {}", authorization_type)),
+            _ => {
+                return Err(CliError::ActionError(format!(
+                    "Invalid authorization type {}",
+                    authorization_type
+                )))
+            }
         };
 
         self.authorization_type = Some(auth_type);
@@ -125,50 +129,45 @@ impl MessageBuilder {
         self.application_metadata = application_metadata.into();
     }
 
-    pub fn build(self) -> Result<CreateCircuit, String> {
+    pub fn build(self) -> Result<CreateCircuit, CliError> {
         let circuit_id = self.make_circuit_id();
         let default_store = get_default_value_store();
 
         let management_type = match self.management_type {
             Some(management_type) => management_type,
-            None => {
-                match default_store
-                    .get_default_value(MANAGEMENT_TYPE_KEY)
-                    .expect("err")
-                {
-                    Some(management_type) => management_type.value(),
-                    None => {
-                        return Err(
-                            "Management type not provided and no default value set".to_string()
-                        )
-                    }
+            None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
+                Some(management_type) => management_type.value(),
+                None => {
+                    return Err(CliError::ActionError(
+                        "Management type not provided and no default value set".to_string(),
+                    ))
                 }
-            }
+            },
         };
 
         let services = self
             .services
             .into_iter()
-            .try_fold::<_, _, Result<_, String>>(Vec::new(), |mut acc, mut builder| {
+            .try_fold::<_, _, Result<_, CliError>>(Vec::new(), |mut acc, mut builder| {
                 if builder.service_type().is_none() {
-                    //let default_store = get_default_value_store();
-                    builder = match default_store
-                        .get_default_value(SERVICE_TYPE_KEY)
-                        .expect("erer")
-                    {
+                    builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
                         Some(service_type) => builder.with_service_type(&service_type.value()),
                         None => {
-                            return Err("Service has no service type and no default value is set"
-                                .to_string())
+                            return Err(CliError::ActionError(
+                                "Service has no service type and no default value is set"
+                                    .to_string(),
+                            ))
                         }
                     }
                 }
-                let service = builder.build().expect("Errrr");
+                let service = builder.build().map_err(|err| {
+                    CliError::ActionError(format!("Failed to build service: {}", err))
+                })?;
                 acc.push(service);
                 Ok(acc)
             })?;
 
-        let mut create_circuit_builder = CreateCircuitMessageBuilder::new()
+        let mut create_circuit_builder = CreateCircuitBuilder::new()
             .with_circuit_id(&circuit_id)
             .with_members(&self.nodes)
             .with_roster(&services)
@@ -180,18 +179,13 @@ impl MessageBuilder {
                 create_circuit_builder.with_authorization_type(&authorization_type);
         }
 
-        let create_circuit = create_circuit_builder
-            .build()
-            .map_err(|err| err.to_string())?;
+        let create_circuit = create_circuit_builder.build().map_err(|err| {
+            CliError::ActionError(format!("Failed to build CreateCircuit message: {}", err))
+        })?;
         Ok(create_circuit)
     }
 
     fn make_circuit_id(&self) -> String {
-        let partial_circuit_id = self.nodes.iter().fold(String::new(), |mut acc, member| {
-            acc.push_str(&format!("::{}", member.node_id));
-            acc
-        });
-
         Uuid::new_v4().to_string()
     }
 
@@ -204,51 +198,11 @@ impl MessageBuilder {
 }
 
 fn is_match(service_id_match: &str, service_id: &str) -> bool {
-    service_id_match.split("*").fold(true, |is_match, part| {
+    service_id_match.split('*').fold(true, |is_match, part| {
         if part.len() != service_id_match.len() {
             is_match && service_id.contains(part)
         } else {
             service_id == part
         }
     })
-}
-
-fn validate_node_endpont(endpoint: &str) -> Result<(), CliError> {
-    if let Err(err) = Url::parse(endpoint) {
-        Err(CliError::ActionError(format!(
-            "{} is not a valid url: {}",
-            endpoint, err
-        )))
-    } else {
-        Ok(())
-    }
-}
-fn make_node_id_from_endpoint(endpoint: &str) -> Result<String, CliError> {
-    match Url::parse(endpoint) {
-        Ok(url) => {
-            let host = match url.host_str() {
-                Some(host) => host,
-                None => {
-                    return Err(CliError::ActionError(format!(
-                        "Invalid node endpoint: {}",
-                        endpoint
-                    )))
-                }
-            };
-            let port = match url.port_or_known_default() {
-                Some(port) => port,
-                None => {
-                    return Err(CliError::ActionError(format!(
-                        "Invalid node endpoint: {}",
-                        endpoint
-                    )))
-                }
-            };
-            Ok(format!("{}_{}", host, port))
-        }
-        Err(err) => Err(CliError::ActionError(format!(
-            "Invalid node endpoint or node alias has not been set: {}",
-            endpoint
-        ))),
-    }
 }

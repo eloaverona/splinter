@@ -17,22 +17,15 @@ mod builder;
 pub mod defaults;
 mod payload;
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 
-use clap::{ArgMatches, Values};
-use regex::Regex;
-use reqwest::Url;
-use splinter::admin::messages::{
-    AuthorizationType, CreateCircuit, DurabilityType, PersistenceType, RouteType, SplinterNode,
-    SplinterService,
-};
+use clap::ArgMatches;
 
 use crate::error::CliError;
 
 use super::Action;
-use builder::MessageBuilder;
+use builder::CreateCircuitMessageBuilder;
 
 pub struct CircuitCreateAction;
 
@@ -43,75 +36,68 @@ impl Action for CircuitCreateAction {
         let key = args
             .value_of("private_key_file")
             .unwrap_or("./splinter.priv");
-        if let Some(path) = args.value_of("path") {
-            create_circuit_proposal(url, key, path)
-        } else {
-            let mut nodes = match args.values_of("node") {
-                Some(nodes) => nodes,
-                None => return Err(CliError::ActionError("Path is required".into())),
-            };
 
-            let mut builder = MessageBuilder::new();
+        let mut builder = CreateCircuitMessageBuilder::new();
 
-            for node in nodes {
-                let (node_id, endpoint) = parse_node_argument(node)?;
-                builder
-                    .add_node(&node_id, endpoint)
-                    .expect("No nodes added");
-            }
+        let nodes = match args.values_of("node") {
+            Some(nodes) => nodes,
+            None => return Err(CliError::ActionError("Path is required".into())),
+        };
 
-            let mut services = match args.values_of("service") {
-                Some(mut services) => services,
-                None => return Err(CliError::ActionError("Service is required".into())),
-            };
-
-            for service in services {
-                let (service_id, allowed_nodes) = parse_service(service)?;
-                builder.add_service(&service_id, &allowed_nodes);
-            }
-
-            if let Some(service_arguments) = args.values_of("service_argument") {
-                for service_argument in service_arguments {
-                    let (service_id_match, argument) = parse_service_argument(service_argument)?;
-                    builder.apply_service_arguments(&service_id_match, &argument);
-                }
-            }
-
-            if let Some(auth_type) = args.value_of("authorization_type") {
-                builder
-                    .set_authorization_type(auth_type)
-                    .expect("err aith type");
-            }
-
-            if let Some(management_type) = args.value_of("management_type") {
-                builder.set_management_type(management_type);
-            }
-
-            if let Some(application_metadata) = args.value_of("application_metadata") {
-                builder.set_application_metadata(application_metadata.as_bytes());
-            }
-
-            if let Some(service_types) = args.values_of("service_type") {
-                for service_type_arg in service_types {
-                    let (service_id_match, service_type) =
-                        parse_sercive_type_argument(service_type_arg)?;
-                    builder.apply_service_type(&service_id_match, &service_type);
-                }
-            }
-
-            let create_circuit = builder.build().expect("Failed to build");
-
-            let client = api::SplinterRestClient::new(url);
-            let requester_node = client.fetch_node_id()?;
-            let private_key_hex = read_private_key(key)?;
-
-            let signed_payload =
-                payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
-
-            client.submit_admin_payload(signed_payload)?;
-
-            Ok(())
+        for node in nodes {
+            let (node_id, endpoint) = parse_node_argument(node)?;
+            builder.add_node(&node_id, endpoint)?;
         }
+
+        let services = match args.values_of("service") {
+            Some(services) => services,
+            None => return Err(CliError::ActionError("Service is required".into())),
+        };
+
+        for service in services {
+            let (service_id, allowed_nodes) = parse_service(service)?;
+            builder.add_service(&service_id, &allowed_nodes);
+        }
+
+        if let Some(service_arguments) = args.values_of("service_argument") {
+            for service_argument in service_arguments {
+                let (service_id_match, argument) = parse_service_argument(service_argument)?;
+                builder.apply_service_arguments(&service_id_match, &argument);
+            }
+        }
+
+        if let Some(auth_type) = args.value_of("authorization_type") {
+            builder.set_authorization_type(auth_type)?;
+        }
+
+        if let Some(management_type) = args.value_of("management_type") {
+            builder.set_management_type(management_type);
+        }
+
+        if let Some(application_metadata) = args.value_of("application_metadata") {
+            builder.set_application_metadata(application_metadata.as_bytes());
+        }
+
+        if let Some(service_types) = args.values_of("service_type") {
+            for service_type_arg in service_types {
+                let (service_id_match, service_type) =
+                    parse_service_type_argument(service_type_arg)?;
+                builder.apply_service_type(&service_id_match, &service_type);
+            }
+        }
+
+        let create_circuit = builder.build()?;
+
+        let client = api::SplinterRestClient::new(url);
+        let requester_node = client.fetch_node_id()?;
+        let private_key_hex = read_private_key(key)?;
+
+        let signed_payload =
+            payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
+
+        client.submit_admin_payload(signed_payload)?;
+
+        Ok(())
     }
 }
 
@@ -139,7 +125,7 @@ fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {
     let allowed_nodes = iter
         .next()
         .ok_or_else(|| CliError::ActionError(format!("allowed nodes not valid {}", service)))?
-        .split(",")
+        .split(',')
         .map(String::from)
         .collect::<Vec<String>>();
 
@@ -162,25 +148,27 @@ fn parse_service_argument(service_argument: &str) -> Result<(String, (String, St
             CliError::ActionError(format!("service_argument not valid {}", service_argument))
         })?
         .to_string();
-    let mut argument_iter = arguments.split("=");
+
+    let mut argument_iter = arguments.split('=');
     let key = argument_iter
         .next()
         .ok_or_else(|| {
             CliError::ActionError(format!("service_argument not valid {}", service_argument))
         })?
         .to_string();
+
     let value = argument_iter
         .next()
         .ok_or_else(|| {
             CliError::ActionError(format!("service_argument not valid {}", service_argument))
         })?
-        .split(",")
+        .split(',')
         .collect::<Vec<&str>>();
 
     Ok((service_id, (key, format!("{:?}", value))))
 }
 
-fn parse_sercive_type_argument(service_type: &str) -> Result<(String, String), CliError> {
+fn parse_service_type_argument(service_type: &str) -> Result<(String, String), CliError> {
     let mut iter = service_type.split("::");
 
     let service_id = iter
@@ -193,52 +181,6 @@ fn parse_sercive_type_argument(service_type: &str) -> Result<(String, String), C
         .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service_type)))?
         .to_string();
     Ok((service_id, service_type))
-}
-
-fn create_circuit_proposal(
-    url: &str,
-    private_key_file: &str,
-    proposal_path: &str,
-) -> Result<(), CliError> {
-    let client = api::SplinterRestClient::new(url);
-    let requester_node = client.fetch_node_id()?;
-    let private_key_hex = read_private_key(private_key_file)?;
-
-    let proposal_file = File::open(proposal_path).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to open {}: {}", proposal_path, err))
-    })?;
-
-    let create_request: CreateCircuit = serde_yaml::from_reader(proposal_file).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to parse {}: {}", proposal_path, err))
-    })?;
-
-    let signed_payload =
-        payload::make_signed_payload(&requester_node, &private_key_hex, create_request)?;
-
-    client.submit_admin_payload(signed_payload)
-}
-
-fn create_circuit_proposal_no_file(
-    url: &str,
-    private_key_file: &str,
-    proposal_path: &str,
-) -> Result<(), CliError> {
-    let client = api::SplinterRestClient::new(url);
-    let requester_node = client.fetch_node_id()?;
-    let private_key_hex = read_private_key(private_key_file)?;
-
-    let proposal_file = File::open(proposal_path).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to open {}: {}", proposal_path, err))
-    })?;
-
-    let create_request: CreateCircuit = serde_yaml::from_reader(proposal_file).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to parse {}: {}", proposal_path, err))
-    })?;
-
-    let signed_payload =
-        payload::make_signed_payload(&requester_node, &private_key_hex, create_request)?;
-
-    client.submit_admin_payload(signed_payload)
 }
 
 /// Reads a private key from the given file name.

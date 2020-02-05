@@ -16,7 +16,7 @@ use super::messages::*;
 use std::error::Error as StdError;
 
 #[derive(Default, Clone)]
-pub struct CreateCircuitMessageBuilder {
+pub struct CreateCircuitBuilder {
     circuit_id: Option<String>,
     roster: Option<Vec<SplinterService>>,
     members: Option<Vec<SplinterNode>>,
@@ -28,22 +28,22 @@ pub struct CreateCircuitMessageBuilder {
     application_metadata: Option<Vec<u8>>,
 }
 
-impl CreateCircuitMessageBuilder {
+impl CreateCircuitBuilder {
     pub fn new() -> Self {
-        CreateCircuitMessageBuilder::default()
+        CreateCircuitBuilder::default()
     }
 
-    pub fn with_circuit_id(mut self, circuit_id: &str) -> CreateCircuitMessageBuilder {
+    pub fn with_circuit_id(mut self, circuit_id: &str) -> CreateCircuitBuilder {
         self.circuit_id = Some(circuit_id.into());
         self
     }
 
-    pub fn with_roster(mut self, services: &[SplinterService]) -> CreateCircuitMessageBuilder {
+    pub fn with_roster(mut self, services: &[SplinterService]) -> CreateCircuitBuilder {
         self.roster = Some(services.into());
         self
     }
 
-    pub fn with_members(mut self, members: &[SplinterNode]) -> CreateCircuitMessageBuilder {
+    pub fn with_members(mut self, members: &[SplinterNode]) -> CreateCircuitBuilder {
         self.members = Some(members.into());
         self
     }
@@ -51,7 +51,7 @@ impl CreateCircuitMessageBuilder {
     pub fn with_authorization_type(
         mut self,
         authorization_type: &AuthorizationType,
-    ) -> CreateCircuitMessageBuilder {
+    ) -> CreateCircuitBuilder {
         self.authorization_type = Some(authorization_type.clone());
         self
     }
@@ -59,17 +59,17 @@ impl CreateCircuitMessageBuilder {
     pub fn with_persistence(
         mut self,
         persistence: &PersistenceType,
-    ) -> CreateCircuitMessageBuilder {
+    ) -> CreateCircuitBuilder {
         self.persistence = Some(persistence.clone());
         self
     }
 
-    pub fn with_durability(mut self, durability: &DurabilityType) -> CreateCircuitMessageBuilder {
+    pub fn with_durability(mut self, durability: &DurabilityType) -> CreateCircuitBuilder {
         self.durability = Some(durability.clone());
         self
     }
 
-    pub fn with_routes(mut self, route_type: &RouteType) -> CreateCircuitMessageBuilder {
+    pub fn with_routes(mut self, route_type: &RouteType) -> CreateCircuitBuilder {
         self.routes = Some(route_type.clone());
         self
     }
@@ -77,15 +77,15 @@ impl CreateCircuitMessageBuilder {
     pub fn with_circuit_management_type(
         mut self,
         circuit_management_type: &str,
-    ) -> CreateCircuitMessageBuilder {
+    ) -> CreateCircuitBuilder {
         self.circuit_management_type = Some(circuit_management_type.into());
         self
     }
 
-    pub fn with_application_metadata_type(
+    pub fn with_application_metadata(
         mut self,
         application_metadata: &[u8],
-    ) -> CreateCircuitMessageBuilder {
+    ) -> CreateCircuitBuilder {
         self.application_metadata = Some(application_metadata.into());
         self
     }
