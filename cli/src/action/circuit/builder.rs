@@ -20,7 +20,10 @@ use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE
 use crate::error::CliError;
 use crate::store::default_value::DefaultValueStore;
 use crate::store::node::NodeStore;
-use splinter::admin::messages::*;
+use splinter::admin::messages::{
+    AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
+    SplinterServiceBuilder,
+};
 
 pub struct CreateCircuitMessageBuilder {
     services: Vec<SplinterServiceBuilder>,
@@ -108,7 +111,7 @@ impl CreateCircuitMessageBuilder {
         self.application_metadata = application_metadata.into();
     }
 
-    pub fn build(mut self) -> Result<CreateCircuit, CliError> {
+    pub fn build(self) -> Result<CreateCircuit, CliError> {
         let circuit_id = make_circuit_id();
         let default_store = get_default_value_store();
 
