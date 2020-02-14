@@ -15,6 +15,20 @@
 use super::builders::{CreateCircuitBuilder, SplinterNodeBuilder, SplinterServiceBuilder};
 use std::collections::HashMap;
 
+struct CircuitManagementTypeRule {
+    name: String,
+    data: Option<String>
+
+}
+
+
+impl Rule for CircuitManagementTypeRule {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn apply(&mut self, values: &[u8], builder: T) -> T;
+    fn get_arguments(&self) -> Vec<RuleArgument>;
+}
 struct CreateCircuitRules {
     circuit_rules: HashMap<String, Box<dyn Rule<CreateCircuitBuilder>>>,
     service_rules: ServiceDefinitionRules,
