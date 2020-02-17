@@ -18,6 +18,12 @@ use std::fs::File;
 use serde_yaml;
 use std::fmt::Debug;
 
+#[derive(Deserialize, Debug)]
+struct CircuitCreateTemplate {
+    args: Vec<RuleArgument>,
+    rules: HashMap<String, serde_yaml::Value>
+}
+
 #[derive(Debug)]
 struct CircuitManagementTypeRule {
     name: String,
@@ -62,7 +68,7 @@ struct CreateServices {
 impl Default for CreateServicesRule {
     fn default() -> Self {
         let nodes_arg = RuleArgument{
-            key: "NODES".to_string(),
+            name: "NODES".to_string(),
             required: true,
             default_value: None,
         };
@@ -116,17 +122,18 @@ impl Default for YamlCreateCircuitTemplateParser {
 impl YamlCreateCircuitTemplateParser {
     fn parse_rules(mut self, path: &str) -> CreateCircuitBuilder {
         let file = File::open(path).expect("err");
-        let template: HashMap<String, Vec<HashMap<String, serde_yaml::Value>>> = serde_yaml::from_reader(file).expect("err open file");
+        let template: CircuitCreateTemplate = serde_yaml::from_reader(file).expect("err open file");
         println!("template {:?}", template);
-        let rules = template.get("rules").unwrap();
-    //    let args = template.get("args").unwrap().into();
+        //let rules = template.get("rules").unwrap();
+        //
+        // let args = template.get("args").unwrap()
 
-        for rule in rules.iter() {
-            for (rule_name, value) in rule.iter() {
-                self.apply_rule(rule_name, &serde_yaml::to_vec(value).expect("errr"))
+        //for rule in template.rules.iter() {
+        for (rule_name, value) in template.rules.iter() {
+            self.apply_rule(rule_name, &serde_yaml::to_vec(value).expect("errr"))
 
-            }
         }
+        //}
 
         CreateCircuitBuilder::new()
     }
@@ -189,23 +196,24 @@ impl Default for CreateCircuitRules {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RuleArgument {
-    key: String,
+    name: String,
     required: bool,
+    #[serde(rename = "default")]
     default_value: Option<String>,
 }
 
 impl RuleArgument {
-    fn new_required_argument(key: &str) -> RuleArgument {
+    fn new_required_argument(name: &str) -> RuleArgument {
         RuleArgument {
-            key: key.to_string(),
+            name: name.to_string(),
             required: true,
             default_value: None,
         }
     }
 
-    fn new_optional_argument(key: &str, default_value: &str) -> RuleArgument {
+    fn new_optional_argument(name: &str, default_value: &str) -> RuleArgument {
         RuleArgument {
-            key: key.to_string(),
+            name: name.to_string(),
             required: false,
             default_value: Some(default_value.into()),
         }
@@ -331,8 +339,13 @@ mod test {
     use std::{env, panic, thread};
 
 
-    static EXAMPLE_RULES_YAML: &[u8; 70] = br##"rules:
-    - set-management-type:
+    static EXAMPLE_RULES_YAML: &[u8; 172] = br##"args:
+    - name: admin-keys
+      required: true
+      type: string
+      default: $(a:SIGNER_PUB_KEY)
+rules:
+    set-management-type:
         management-type: "gameroom" "##;
 
     /*
@@ -367,7 +380,7 @@ mod test {
          let test_path = test_yaml_file.clone();
          let result = panic::catch_unwind(move || test(&test_path));
 
-         remove_file(test_yaml_file).unwrap();
+        // remove_file(test_yaml_file).unwrap();
 
          assert!(result.is_ok())
      }
@@ -381,6 +394,7 @@ mod test {
      }
 
      fn write_yaml_file(file_path: &str) {
+         println!("file_path {}", file_path);
         let mut file = File::create(file_path).expect("Error creating test rules yaml file.");
 
         file.write_all(EXAMPLE_RULES_YAML)
