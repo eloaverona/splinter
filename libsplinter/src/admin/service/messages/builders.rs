@@ -18,7 +18,7 @@ use super::{
 };
 use std::error::Error as StdError;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct CreateCircuitBuilder {
     circuit_id: Option<String>,
     roster: Option<Vec<SplinterService>>,
@@ -204,7 +204,7 @@ impl CreateCircuitBuilder {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct SplinterServiceBuilder {
     service_id: Option<String>,
     service_type: Option<String>,
@@ -285,7 +285,7 @@ impl SplinterServiceBuilder {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct SplinterNodeBuilder {
     node_id: Option<String>,
     endpoint: Option<String>,
