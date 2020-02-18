@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod error;
+mod rules;
 
 use std::collections::HashMap;
 
