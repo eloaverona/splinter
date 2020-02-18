@@ -13,11 +13,13 @@
 // limitations under the License.
 
 mod error;
+mod parser;
 mod rules;
 
 use std::collections::HashMap;
 
-pub use error::RuleError;
+pub use error::{RuleError, TemplateParserError};
+pub use parser::YamlCreateCircuitTemplateParser;
 
 pub trait Rule<T> {
     /// Rule name
