@@ -41,7 +41,7 @@ impl Rule<CreateCircuitBuilder> for CircuitManagementTypeRule {
     fn name(&self) -> String {
         self.name.clone()
     }
-    fn apply(&mut self, values: &[u8], builder: CreateCircuitBuilder) -> CreateCircuitBuilder {
+    fn apply(&mut self, values: &[u8], _: &HashMap<String, String>, builder: CreateCircuitBuilder) -> CreateCircuitBuilder {
         let management_type = serde_yaml::from_slice::<HashMap<String, String>>(values).expect("failed to parse managment type");
         let circuit_management_type = management_type.get("management-type").unwrap();
         builder.with_circuit_management_type(circuit_management_type)
@@ -83,16 +83,28 @@ impl Rule<Vec<SplinterServiceBuilder>> for CreateServicesRule {
     fn name(&self) -> String {
         self.name.clone()
     }
-    fn apply(&mut self, values: &[u8], builders: Vec<SplinterServiceBuilder>) -> Vec<SplinterServiceBuilder> {
+    fn apply(&mut self, values: &[u8], args: &HashMap<String, String>, _: Vec<SplinterServiceBuilder>) -> Vec<SplinterServiceBuilder> {
         let create_services = serde_yaml::from_slice::<CreateServices>(values).expect("failed to parse managment type");
+        let nodes = args.get("NODES").expect("No nodes").split(",").collect::<Vec<String>>();
+        let valid_chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        let first_service = create_services.first_service
+        for node in nodes {
+            let splinter_service_builder = SplinterServiceBuilder::new().with_service_id(service_id: &str)
+        }
+
         vec![]
         // let circuit_management_type = management_type.get("management-type").unwrap();
-        // builder.with_circuit_management_type(circuit_management_type)
+        // builder.with_circuit_management_type(circuit_management_type)c
     }
 
     fn get_arguments(&self) -> Vec<RuleArgument> {
         self.args.clone()
     }
+}
+
+fn get_next_service_id(current_id: &str) -> String {
+    let last_char = current_id.to_string().pop().expect("charr");
+    if last_char.is_numeric()
 }
 
 
@@ -120,7 +132,7 @@ impl Default for YamlCreateCircuitTemplateParser {
 }
 
 impl YamlCreateCircuitTemplateParser {
-    fn parse_rules(mut self, path: &str) -> CreateCircuitBuilder {
+    fn parse_rules(mut self, path: &str, arg_values: HashMap<String, String>) -> CreateCircuitBuilder {
         let file = File::open(path).expect("err");
         let template: CircuitCreateTemplate = serde_yaml::from_reader(file).expect("err open file");
         println!("template {:?}", template);
@@ -130,7 +142,7 @@ impl YamlCreateCircuitTemplateParser {
 
         //for rule in template.rules.iter() {
         for (rule_name, value) in template.rules.iter() {
-            self.apply_rule(rule_name, &serde_yaml::to_vec(value).expect("errr"))
+            self.apply_rule(rule_name, &arg_values, &serde_yaml::to_vec(value).expect("errr"))
 
         }
         //}
@@ -159,13 +171,13 @@ impl YamlCreateCircuitTemplateParser {
         self.node_rules.register_rule(name, rule);
     }
 
-    fn apply_rule(&mut self, name: &str, values: &[u8]) {
+    fn apply_rule(&mut self, name: &str, args: &HashMap<String, String>, values: &[u8]) {
         // if let Some(rule) = self.circuit_rules.get_mut(name) {
         //     self.builder = rule.apply(values, self.builder.clone());
         //     return ();
         // }
         println!("got to template parser apply_rule");
-        self.circuit_rules.apply_rule(name, values); //TO DO need way to check which kind of rule
+        self.circuit_rules.apply_rule(name, args, values); //TO DO need way to check which kind of rule
         //
         // self.service_rules.apply_rule(name, values);
         //
@@ -226,9 +238,9 @@ struct ServiceDefinitionRules {
 }
 
 impl ServiceDefinitionRules {
-    fn apply_rule(&mut self, name: &str, values: &[u8]) {
+    fn apply_rule(&mut self, name: &str, args: &HashMap<String, String>, values: &[u8]) {
         if let Some(rule) = self.rules.get_mut(name) {
-            self.builders = rule.apply(values, self.builders.clone());
+            self.builders = rule.apply(values, args, self.builders.clone());
             return ();
         }
     }
@@ -256,9 +268,9 @@ struct NodeDefinitionRules {
 }
 
 impl NodeDefinitionRules {
-    fn apply_rule(&mut self, name: &str, values: &[u8]) {
+    fn apply_rule(&mut self, name: &str, args: &HashMap<String, String>, values: &[u8]) {
         if let Some(rule) = self.rules.get_mut(name) {
-            self.builders = rule.apply(values, self.builders.clone());
+            self.builders = rule.apply(values, args, self.builders.clone());
             return ();
         }
     }
@@ -280,7 +292,7 @@ impl Default for NodeDefinitionRules {
 }
 
 impl CreateCircuitRules {
-    fn apply_rule(&mut self, name: &str, values: &[u8]) {
+    fn apply_rule(&mut self, name: &str, args: &HashMap<String, String>, values: &[u8]) {
         println!("got to CreateCircuitRules apply_rule");
         println!("circuit_create_rule {:?}", self.rules);
         println!("name {}", name);
@@ -289,7 +301,7 @@ impl CreateCircuitRules {
         if let Some(rule) = self.rules.get_mut(name) {
             println!("found rule");
 
-            self.builder = rule.apply(values, self.builder.clone());
+            self.builder = rule.apply(values, args, self.builder.clone());
             println!("builder {:?}", self.builder);
             return ();
         }
@@ -327,7 +339,7 @@ pub enum RuleType {
 
 pub trait Rule<T: Debug> : Debug {
     fn name(&self) -> String;
-    fn apply(&mut self, values: &[u8], builder: T) -> T;
+    fn apply(&mut self, values: &[u8], args: &HashMap<String, String>, builder: T) -> T;
     fn get_arguments(&self) -> Vec<RuleArgument>;
 }
 
@@ -358,7 +370,7 @@ rules:
             write_yaml_file(test_yaml_file_path);
             let template_parser = YamlCreateCircuitTemplateParser::default();
 
-            template_parser.parse_rules(test_yaml_file_path);
+            template_parser.parse_rules(test_yaml_file_path, HashMap::new());
             assert!(false)
 
             // let payload = parse_product_yaml(
@@ -380,7 +392,7 @@ rules:
          let test_path = test_yaml_file.clone();
          let result = panic::catch_unwind(move || test(&test_path));
 
-        // remove_file(test_yaml_file).unwrap();
+         remove_file(test_yaml_file).unwrap();
 
          assert!(result.is_ok())
      }
