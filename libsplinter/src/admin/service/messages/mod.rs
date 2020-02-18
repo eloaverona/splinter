@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub mod builders;
-pub mod templates;
+//pub mod templates;
 
 use protobuf::{self, RepeatedField};
 

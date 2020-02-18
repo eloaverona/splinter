@@ -14,11 +14,12 @@
 
 use std::collections::HashMap;
 
-use crate::admin::messages::CreateCircuitBuilder;
+use crate::admin::messages::{CreateCircuitBuilder, SplinterServiceBuilder};
 
 use super::{Rule, RuleArgument, RuleError};
 
 const MANAGEMENT_TYPE_RULE_NAME: &str = "set-management-type";
+const CREATE_SERVICES_RULE_NAME: &str = "create-services";
 
 #[derive(Debug)]
 pub(super) struct CircuitManagementTypeRule {
@@ -57,6 +58,97 @@ impl Rule<CreateCircuitBuilder> for CircuitManagementTypeRule {
     fn get_arguments(&self) -> Vec<RuleArgument> {
         vec![]
     }
+}
+
+struct CreateServicesRule {
+    name: String,
+    args: Vec<RuleArgument>,
+}
+
+#[derive(Deserialize)]
+struct CreateServices {
+    service_type: String,
+    service_args: Vec<HashMap<String, String>>,
+    first_service: String,
+}
+
+impl Default for CreateServicesRule {
+    fn default() -> Self {
+        let nodes_arg = RuleArgument {
+            name: "NODES".to_string(),
+            required: true,
+            default_value: None,
+        };
+        CreateServicesRule {
+            name: CREATE_SERVICES_RULE_NAME.to_string(),
+            args: vec![nodes_arg],
+        }
+    }
+}
+
+impl Rule<Vec<SplinterServiceBuilder>> for CreateServicesRule {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn apply(
+        &mut self,
+        values: &[u8],
+        args: &HashMap<String, String>,
+        _: Vec<SplinterServiceBuilder>,
+    ) -> Result<Vec<SplinterServiceBuilder>, RuleError> {
+        let create_services = serde_yaml::from_slice::<CreateServices>(values)
+            .expect("failed to parse managment type");
+        let nodes = args
+            .get("NODES")
+            .expect("No nodes")
+            .split(",")
+            .map(String::from)
+            .collect::<Vec<String>>();
+        let valid_chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        let first_service = create_services.first_service;
+        for node in nodes {
+            //    let splinter_service_builder = SplinterServiceBuilder::new().with_service_id(service_id: &str);
+        }
+
+        Ok(vec![])
+        // let circuit_management_type = management_type.get("management-type").unwrap();
+        // builder.with_circuit_management_type(circuit_management_type)c
+    }
+
+    fn get_arguments(&self) -> Vec<RuleArgument> {
+        self.args.clone()
+    }
+}
+
+fn get_next_service_id(current_id: &str) -> Result<String, RuleError> {
+    let alphanumeric = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    let mut next_id = current_id.to_string();
+    for (char_index, char) in current_id.char_indices().rev() {
+        let index = alphanumeric.find(char).ok_or_else(|| {
+            RuleError::InvalidFormat(
+                "The field first_service must contain only valid base62 characters".to_string(),
+            )
+        })?;
+        match alphanumeric.get(index + 1..index + 2) {
+            Some(sub_str) => {
+                println!("sub_str {}", sub_str);
+                let mut next_id_sub_string = next_id.get(char_index + 1..).unwrap_or_default();
+                let new_sub_string = format!("{}{}", sub_str, next_id_sub_string);
+                next_id.replace_range(char_index.., &new_sub_string);
+                return Ok(next_id);
+            }
+            None => {
+                let mut next_id_sub_string = next_id.get(char_index + 1..).unwrap_or_default();
+                let new_sub_string =
+                    format!("{}{}", alphanumeric[0..1].to_string(), next_id_sub_string);
+                next_id.replace_range(char_index.., &new_sub_string);
+            }
+        }
+    }
+
+    return Err(RuleError::InvalidFormat(
+        "Exceed number of services that can be built".to_string(),
+    ))?;
 }
 
 #[cfg(test)]
