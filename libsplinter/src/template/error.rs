@@ -17,6 +17,7 @@ use crate::admin::messages::BuilderError;
 #[derive(Debug)]
 pub enum RuleError {
     InvalidFormat(String),
+    InternalError(String),
     SerdeError(serde_yaml::Error),
 }
 
@@ -28,6 +29,11 @@ impl std::fmt::Display for RuleError {
             RuleError::InvalidFormat(ref s) => {
                 write!(f, "The data provided is not in the correct format: {}", s)
             }
+            RuleError::InternalError(ref s) => write!(
+                f,
+                "The rule encountered an internal error while processing data: {}",
+                s
+            ),
             RuleError::SerdeError(ref err) => write!(f, "Deserialization error: {}", err),
         }
     }
