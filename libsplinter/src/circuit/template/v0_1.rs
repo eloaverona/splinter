@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use super::{yaml_parser::v0_1, Error};
-use super::{Builders, CreateCircuitBuilder};
+use super::{Builders, CreateCircuitBuilder, SplinterServiceBuilder};
 
 pub struct CircuitCreateTemplate {
     _version: String,
@@ -65,7 +65,7 @@ impl From<v0_1::YamlRuleArgument> for RuleArgument {
 
 struct Rules {
     set_management_type: CircuitManagement,
-    create_services: Option<CreateServices>
+    create_services: Option<CreateServices>,
 }
 
 impl Rules {
@@ -109,11 +109,37 @@ impl From<v0_1::YamlCircuitManagement> for CircuitManagement {
     }
 }
 
-
 struct CreateServices {
     service_type: String,
     service_args: Vec<ServiceArgument>,
     first_service: String,
+}
+
+impl CreateServices {
+    fn apply_rule(
+        &self,
+        args: HashMap<String, String>,
+    ) -> Result<Vec<SplinterServiceBuilder>, Error> {
+        let nodes = args
+            .get("NODES")
+            .expect("No nodes")
+            .split(",")
+            .map(String::from)
+            .collect::<Vec<String>>();
+
+        let mut service_id = self.first_service.clone();
+        let mut service_builders = vec![];
+        for node in nodes {
+            let mut splinter_service_builder = SplinterServiceBuilder::new()
+                .with_service_id(&service_id)
+                .with_allowed_nodes(&vec![node])
+                .with_service_type(&self.service_type);
+
+            service_builders.push(splinter_service_builder);
+            service_id = get_next_service_id(&service_id)?;
+        }
+        Ok(service_builders)
+    }
 }
 
 struct ServiceArgument {
@@ -121,12 +147,15 @@ struct ServiceArgument {
     value: String,
 }
 
-
 impl From<v0_1::YamlCreateServices> for CreateServices {
     fn from(yaml_create_services: v0_1::YamlCreateServices) -> Self {
         CreateServices {
             service_type: yaml_create_services.service_type(),
-            service_args: yaml_create_services.service_args().into_iter().map(ServiceArgument::from).collect(),
+            service_args: yaml_create_services
+                .service_args()
+                .into_iter()
+                .map(ServiceArgument::from)
+                .collect(),
             first_service: yaml_create_services.first_service(),
         }
     }
@@ -139,4 +168,30 @@ impl From<v0_1::YamlServiceArgument> for ServiceArgument {
             value: yaml_service_argument.value(),
         }
     }
+}
+
+fn get_next_service_id(current_id: &str) -> Result<String, Error> {
+    let alphanumeric = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    let mut next_id = current_id.to_string();
+    for (char_index, char) in current_id.char_indices().rev() {
+        let index = alphanumeric.find(char).ok_or_else(|| {
+            Error::new("The field first_service must contain only valid base62 characters")
+        })?;
+        match alphanumeric.get(index + 1..index + 2) {
+            Some(sub_str) => {
+                let mut next_id_sub_string = next_id.get(char_index + 1..).unwrap_or_default();
+                let new_sub_string = format!("{}{}", sub_str, next_id_sub_string);
+                next_id.replace_range(char_index.., &new_sub_string);
+                return Ok(next_id);
+            }
+            None => {
+                let mut next_id_sub_string = next_id.get(char_index + 1..).unwrap_or_default();
+                let new_sub_string =
+                    format!("{}{}", alphanumeric[0..1].to_string(), next_id_sub_string);
+                next_id.replace_range(char_index.., &new_sub_string);
+            }
+        }
+    }
+
+    return Err(Error::new("Exceed number of services that can be built"));
 }
