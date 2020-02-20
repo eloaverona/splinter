@@ -15,11 +15,22 @@
 use std::collections::HashMap;
 
 use super::{yaml_parser::v0_1, Error};
+use super::{Builders, CreateCircuitBuilder};
 
 pub struct CircuitCreateTemplate {
     _version: String,
     _args: Vec<RuleArgument>,
     rules: Rules,
+}
+
+impl CircuitCreateTemplate {
+    pub fn apply_rules(
+        &self,
+        builders: &mut Builders,
+        arguments: &HashMap<String, String>,
+    ) -> Result<(), Error> {
+        self.rules.apply_rules(builders, arguments)
+    }
 }
 
 impl From<v0_1::YamlCircuitCreateTemplate> for CircuitCreateTemplate {
@@ -56,6 +67,20 @@ struct Rules {
     set_management_type: CircuitManagement,
 }
 
+impl Rules {
+    fn apply_rules(
+        &self,
+        builders: &mut Builders,
+        _arguments: &HashMap<String, String>,
+    ) -> Result<(), Error> {
+        let create_service_builder = self
+            .set_management_type
+            .apply_rule(builders.create_circuit_builder())?;
+        builders.set_create_circuit_builder(create_service_builder);
+        Ok(())
+    }
+}
+
 impl From<v0_1::YamlRules> for Rules {
     fn from(rules: v0_1::YamlRules) -> Self {
         Rules {
@@ -66,6 +91,12 @@ impl From<v0_1::YamlRules> for Rules {
 
 struct CircuitManagement {
     management_type: String,
+}
+
+impl CircuitManagement {
+    fn apply_rule(&self, builder: CreateCircuitBuilder) -> Result<CreateCircuitBuilder, Error> {
+        Ok(builder.with_circuit_management_type(&self.management_type))
+    }
 }
 
 impl From<v0_1::YamlCircuitManagement> for CircuitManagement {
