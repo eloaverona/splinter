@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod error;
+mod v0_1;
 mod yaml_parser;
 
 pub use error::Error;
