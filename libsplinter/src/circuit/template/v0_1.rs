@@ -65,6 +65,7 @@ impl From<v0_1::YamlRuleArgument> for RuleArgument {
 
 struct Rules {
     set_management_type: CircuitManagement,
+    create_services: Option<CreateServices>
 }
 
 impl Rules {
@@ -85,6 +86,7 @@ impl From<v0_1::YamlRules> for Rules {
     fn from(rules: v0_1::YamlRules) -> Self {
         Rules {
             set_management_type: CircuitManagement::from(rules.set_management_type()),
+            create_services: rules.create_services().map(CreateServices::from),
         }
     }
 }
@@ -103,6 +105,38 @@ impl From<v0_1::YamlCircuitManagement> for CircuitManagement {
     fn from(yaml_circuit_management: v0_1::YamlCircuitManagement) -> Self {
         CircuitManagement {
             management_type: yaml_circuit_management.management_type(),
+        }
+    }
+}
+
+
+struct CreateServices {
+    service_type: String,
+    service_args: Vec<ServiceArgument>,
+    first_service: String,
+}
+
+struct ServiceArgument {
+    key: String,
+    value: String,
+}
+
+
+impl From<v0_1::YamlCreateServices> for CreateServices {
+    fn from(yaml_create_services: v0_1::YamlCreateServices) -> Self {
+        CreateServices {
+            service_type: yaml_create_services.service_type(),
+            service_args: yaml_create_services.service_args().into_iter().map(ServiceArgument::from).collect(),
+            first_service: yaml_create_services.first_service(),
+        }
+    }
+}
+
+impl From<v0_1::YamlServiceArgument> for ServiceArgument {
+    fn from(yaml_service_argument: v0_1::YamlServiceArgument) -> Self {
+        ServiceArgument {
+            key: yaml_service_argument.key(),
+            value: yaml_service_argument.value(),
         }
     }
 }
