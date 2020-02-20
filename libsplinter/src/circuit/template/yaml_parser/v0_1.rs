@@ -59,6 +59,7 @@ impl YamlRuleArgument {
 #[serde(rename_all = "kebab-case")]
 pub struct YamlRules {
     set_management_type: YamlCircuitManagement,
+    create_services: Option<YamlCreateServices>,
 }
 
 impl YamlRules {
@@ -76,5 +77,34 @@ pub struct YamlCircuitManagement {
 impl YamlCircuitManagement {
     pub fn management_type(&self) -> String {
         self.management_type.clone()
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+struct YamlCreateServices {
+    service_type: String,
+    service_args: Vec<YamlServiceArgument>,
+    first_service: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+struct YamlServiceArgument {
+    key: String,
+    value: String,
+}
+
+impl YamlCreateServices {
+    pub fn service_type(&self) -> String {
+        self.service_type.clone()
+    }
+
+    pub fn service_args(&self) -> Vec<YamlServiceArgument> {
+        self.service_args.clone()
+    }
+
+    pub fn first_service(&self) -> String {
+        self.first_service.clone()
     }
 }
