@@ -64,14 +64,22 @@ mod test {
     use std::io::Write;
     use std::{env, panic, thread};
 
-    static EXAMPLE_TEMPLATE_YAML: &[u8; 168] = br##"version: v0.1
+    static EXAMPLE_TEMPLATE_YAML: &[u8; 407] = br##"version: v0.1
 args:
     - name: admin-keys
       required: false
       default: $(a:SIGNER_PUB_KEY)
 rules:
     set-management-type:
-        management-type: "gameroom" "##;
+        management-type: "gameroom"
+    create-services:
+        service-type: 'scabbard'
+        service-args:
+        - key: 'admin-keys'
+          value: $(admin-keys)
+        - key: 'peer-services'
+          value: '$(r:ALL_OTHER_SERVICES)'
+        first-service: 'a000' "##;
 
     /*
      * Verifies load_template correctly loads a template version 0.1
@@ -86,16 +94,29 @@ rules:
                 Template::V0_1(template) => {
                     assert_eq!(&template.version(), "v0.1");
                     let args = template.args();
-                    for arg in args {
-                        assert_eq!(&arg.name(), "admin-keys");
-                        assert_eq!(arg.required(), false);
-                        assert_eq!(arg.default_value(), Some("$(a:SIGNER_PUB_KEY)".into()));
-                    }
+                    assert!(args.iter().any(|arg| arg.name() == "admin-keys"
+                        && arg.required() == false
+                        && arg.default_value() == Some("$(a:SIGNER_PUB_KEY)".into())));
 
                     assert_eq!(
                         &template.rules().set_management_type().management_type(),
                         "gameroom"
                     );
+
+                    let create_services = template
+                        .rules()
+                        .create_services()
+                        .expect("Did not parse create_services rule");
+                    assert_eq!(&create_services.service_type(), "scabbard");
+
+                    assert_eq!(&create_services.first_service(), "a000");
+
+                    let service_args = create_services.service_args();
+                    assert!(service_args
+                        .iter()
+                        .any(|arg| arg.key() == "admin-keys" && arg.value() == "$(admin-keys)"));
+                    assert!(service_args.iter().any(|arg| arg.key() == "peer-services"
+                        && arg.value() == "$(r:ALL_OTHER_SERVICES)"));
                 }
             }
         })
