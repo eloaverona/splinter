@@ -17,6 +17,9 @@ use std::collections::HashMap;
 use super::{yaml_parser::v0_1, Error};
 use super::{Builders, CreateCircuitBuilder, SplinterServiceBuilder};
 
+const ALL_OTHER_SERVICES: &str = "ALL_OTHER_SERVICES";
+const PEER_SERVICES_ARG: &str = "peer_services";
+
 pub struct CircuitCreateTemplate {
     _version: String,
     _args: Vec<RuleArgument>,
@@ -138,6 +141,24 @@ impl CreateServices {
             service_builders.push(splinter_service_builder);
             service_id = get_next_service_id(&service_id)?;
         }
+
+        let mut service_args = Vec::new();
+        for arg in self.service_args.iter() {
+            if arg.key == PEER_SERVICES_ARG && arg.value == ALL_OTHER_SERVICES {
+                service_builders = all_services(service_builders)?;
+            } else {
+                service_args.push((arg.key.clone(), arg.value.clone()))
+            }
+        }
+        service_builders = service_builders
+            .into_iter()
+            .map(|builder| {
+                let mut service_args = builder.arguments().unwrap_or_default();
+                service_args.extend(service_args.clone());
+                builder.with_arguments(&service_args)
+            })
+            .collect::<Vec<SplinterServiceBuilder>>();
+
         Ok(service_builders)
     }
 }
@@ -197,25 +218,27 @@ fn get_next_service_id(current_id: &str) -> Result<String, Error> {
 }
 
 fn all_services(
-) -> Box<dyn Fn(Vec<SplinterServiceBuilder>) -> Result<Vec<SplinterServiceBuilder>, RuleError>> {
-    Box::new(|service_builders| {
-        let peers = service_builders.iter().try_fold::<_, _, Result<Vec<String>, RuleError>>(Vec::new(), |mut acc, builder| {
-            let service_id = builder.service_id()
-                .ok_or_else(|| RuleError::InternalError("The service_id must be set before the service argument PEER_SERVICES can be set".to_string()))?;
-            acc.push(service_id);
-            Ok(acc)
-        })?;
-        let services = service_builders
-            .into_iter()
-            .enumerate()
-            .map(|(index, builder)| {
-                let mut service_peers = peers.clone();
-                service_peers.remove(index);
-                let mut service_args = builder.arguments().unwrap_or_default();
-                service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
-                builder.with_arguments(&service_args)
-            })
-            .collect::<Vec<SplinterServiceBuilder>>();
-        Ok(services)
-    })
+    service_builders: Vec<SplinterServiceBuilder>,
+) -> Result<Vec<SplinterServiceBuilder>, Error> {
+    let peers = service_builders.iter().try_fold::<_, _, Result<Vec<String>, Error>>(Vec::new(), |mut acc, builder| {
+        let service_id = builder.service_id()
+            .ok_or_else(|| {
+                error!("The service_id must be set before the service argument PEER_SERVICES can be set");
+                Error::new("Failed to parse template due to an internal error")
+            })?;
+        acc.push(service_id);
+        Ok(acc)
+    })?;
+    let services = service_builders
+        .into_iter()
+        .enumerate()
+        .map(|(index, builder)| {
+            let mut service_peers = peers.clone();
+            service_peers.remove(index);
+            let mut service_args = builder.arguments().unwrap_or_default();
+            service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
+            builder.with_arguments(&service_args)
+        })
+        .collect::<Vec<SplinterServiceBuilder>>();
+    Ok(services)
 }
