@@ -195,3 +195,27 @@ fn get_next_service_id(current_id: &str) -> Result<String, Error> {
 
     return Err(Error::new("Exceed number of services that can be built"));
 }
+
+fn all_services(
+) -> Box<dyn Fn(Vec<SplinterServiceBuilder>) -> Result<Vec<SplinterServiceBuilder>, RuleError>> {
+    Box::new(|service_builders| {
+        let peers = service_builders.iter().try_fold::<_, _, Result<Vec<String>, RuleError>>(Vec::new(), |mut acc, builder| {
+            let service_id = builder.service_id()
+                .ok_or_else(|| RuleError::InternalError("The service_id must be set before the service argument PEER_SERVICES can be set".to_string()))?;
+            acc.push(service_id);
+            Ok(acc)
+        })?;
+        let services = service_builders
+            .into_iter()
+            .enumerate()
+            .map(|(index, builder)| {
+                let mut service_peers = peers.clone();
+                service_peers.remove(index);
+                let mut service_args = builder.arguments().unwrap_or_default();
+                service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
+                builder.with_arguments(&service_args)
+            })
+            .collect::<Vec<SplinterServiceBuilder>>();
+        Ok(services)
+    })
+}
