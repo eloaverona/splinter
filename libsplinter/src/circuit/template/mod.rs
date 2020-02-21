@@ -110,7 +110,24 @@ rules:
                 Some("gameroom".to_string())
             );
             let service_builders = builders.service_builders();
-            
+            let service_alpha_node = service_builders
+                .iter()
+                .find(|service| service.allowed_nodes() == Some(vec!["alpha-node-000".to_string()]))
+                .expect("service builder for alpha-node was not created correctly");
+
+
+            assert_eq!(service_alpha_node.service_id(), Some("a000".to_string()));
+            assert_eq!(service_alpha_node.service_type(), Some("scabbard".to_string()));
+
+            let alpha_service_args = service_alpha_node.arguments().expect("service for alpha node has no arguments set");
+            println!("alpha_service_args {:?}", alpha_service_args);
+            assert!(alpha_service_args
+                .iter()
+                .any(|(key, value)| key == "admin-keys" && value == "$(admin-keys)"));
+            assert!(alpha_service_args.iter().any(|(key, value)| key == "peer-services"
+                && value == "$(r:ALL_OTHER_SERVICES)"));
+
+
         })
     }
 
