@@ -72,14 +72,22 @@ mod test {
     use std::io::Write;
     use std::{env, panic, thread};
 
-    static EXAMPLE_TEMPLATE_YAML: &[u8; 167] = br##"version: v0.1
+    static EXAMPLE_TEMPLATE_YAML: &[u8; 407] = br##"version: v0.1
 args:
     - name: admin-keys
-      required: true
+      required: false
       default: $(a:SIGNER_PUB_KEY)
 rules:
     set-management-type:
-        management-type: "gameroom" "##;
+        management-type: "gameroom"
+    create-services:
+        service-type: 'scabbard'
+        service-args:
+        - key: 'admin-keys'
+          value: $(admin-keys)
+        - key: 'peer-services'
+          value: '$(r:ALL_OTHER_SERVICES)'
+        first-service: 'a000' "##;
 
     /*
      * Verifies that Builders can be parsed from template v0.1 and correctly
@@ -89,13 +97,20 @@ rules:
     fn test_builds_template_v0_1() {
         run_test(|test_yaml_file_path| {
             write_yaml_file(test_yaml_file_path);
-            let builders = Builders::try_from_template(test_yaml_file_path, &HashMap::new())
+            let mut args = HashMap::new();
+            args.insert(
+                "NODES".to_string(),
+                "alpha-node-000,beta-node-000".to_string(),
+            );
+            let builders = Builders::try_from_template(test_yaml_file_path, &args)
                 .expect("Error getting builders from templates");
             let circuit_create_builder = builders.create_circuit_builder();
             assert_eq!(
                 circuit_create_builder.circuit_management_type(),
                 Some("gameroom".to_string())
             );
+            let service_builders = builders.service_builders();
+            
         })
     }
 

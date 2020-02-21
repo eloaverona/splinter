@@ -75,12 +75,19 @@ impl Rules {
     fn apply_rules(
         &self,
         builders: &mut Builders,
-        _arguments: &HashMap<String, String>,
+        arguments: &HashMap<String, String>,
     ) -> Result<(), Error> {
+        let mut service_builders = builders.service_builders();
+
         let create_service_builder = self
             .set_management_type
             .apply_rule(builders.create_circuit_builder())?;
+
+        if let Some(create_services) = &self.create_services {
+            service_builders = create_services.apply_rule(arguments)?;
+        }
         builders.set_create_circuit_builder(create_service_builder);
+        builders.set_service_builders(service_builders);
         Ok(())
     }
 }
@@ -121,7 +128,7 @@ struct CreateServices {
 impl CreateServices {
     fn apply_rule(
         &self,
-        args: HashMap<String, String>,
+        args: &HashMap<String, String>,
     ) -> Result<Vec<SplinterServiceBuilder>, Error> {
         let nodes = args
             .get("NODES")
