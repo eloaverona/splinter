@@ -115,19 +115,44 @@ rules:
                 .find(|service| service.allowed_nodes() == Some(vec!["alpha-node-000".to_string()]))
                 .expect("service builder for alpha-node was not created correctly");
 
-
             assert_eq!(service_alpha_node.service_id(), Some("a000".to_string()));
-            assert_eq!(service_alpha_node.service_type(), Some("scabbard".to_string()));
+            assert_eq!(
+                service_alpha_node.service_type(),
+                Some("scabbard".to_string())
+            );
 
-            let alpha_service_args = service_alpha_node.arguments().expect("service for alpha node has no arguments set");
+            let alpha_service_args = service_alpha_node
+                .arguments()
+                .expect("service for alpha node has no arguments set");
             println!("alpha_service_args {:?}", alpha_service_args);
             assert!(alpha_service_args
                 .iter()
                 .any(|(key, value)| key == "admin-keys" && value == "$(admin-keys)"));
-            assert!(alpha_service_args.iter().any(|(key, value)| key == "peer-services"
-                && value == "$(r:ALL_OTHER_SERVICES)"));
+            assert!(alpha_service_args
+                .iter()
+                .any(|(key, value)| key == "peer-services" && value == "[\"a001\"]"));
 
+            let service_beta_node = service_builders
+                .iter()
+                .find(|service| service.allowed_nodes() == Some(vec!["beta-node-000".to_string()]))
+                .expect("service builder for beta-node was not created correctly");
 
+            assert_eq!(service_beta_node.service_id(), Some("a001".to_string()));
+            assert_eq!(
+                service_beta_node.service_type(),
+                Some("scabbard".to_string())
+            );
+
+            let beta_service_args = service_beta_node
+                .arguments()
+                .expect("service for beta node has no arguments set");
+            println!("beta_service_args {:?}", beta_service_args);
+            assert!(beta_service_args
+                .iter()
+                .any(|(key, value)| key == "admin-keys" && value == "$(admin-keys)"));
+            assert!(beta_service_args
+                .iter()
+                .any(|(key, value)| key == "peer-services" && value == "[\"a000\"]"));
         })
     }
 

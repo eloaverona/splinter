@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use super::{yaml_parser::v0_1, Error};
 use super::{Builders, CreateCircuitBuilder, SplinterServiceBuilder};
 
-const ALL_OTHER_SERVICES: &str = "ALL_OTHER_SERVICES";
-const PEER_SERVICES_ARG: &str = "peer_services";
+const ALL_OTHER_SERVICES: &str = "$(r:ALL_OTHER_SERVICES)";
+const PEER_SERVICES_ARG: &str = "peer-services";
 
 pub struct CircuitCreateTemplate {
     _version: String,
@@ -148,20 +148,24 @@ impl CreateServices {
             service_builders.push(splinter_service_builder);
             service_id = get_next_service_id(&service_id)?;
         }
+        println!("self.service_args {:?}", self.service_args);
 
-        let mut service_args = Vec::new();
+        let mut new_service_args = Vec::new();
         for arg in self.service_args.iter() {
             if arg.key == PEER_SERVICES_ARG && arg.value == ALL_OTHER_SERVICES {
                 service_builders = all_services(service_builders)?;
             } else {
-                service_args.push((arg.key.clone(), arg.value.clone()))
+                new_service_args.push((arg.key.clone(), arg.value.clone()))
             }
         }
+        println!("service_args {:?}", new_service_args);
         service_builders = service_builders
             .into_iter()
             .map(|builder| {
                 let mut service_args = builder.arguments().unwrap_or_default();
-                service_args.extend(service_args.clone());
+                println!("already set service_args {:?}", service_args);
+
+                service_args.extend(new_service_args.clone());
                 builder.with_arguments(&service_args)
             })
             .collect::<Vec<SplinterServiceBuilder>>();
@@ -170,6 +174,7 @@ impl CreateServices {
     }
 }
 
+#[derive(Debug)]
 struct ServiceArgument {
     key: String,
     value: String,
