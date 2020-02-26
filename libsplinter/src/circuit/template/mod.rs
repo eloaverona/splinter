@@ -72,11 +72,13 @@ mod test {
     use std::io::Write;
     use std::{env, panic, thread};
 
-    static EXAMPLE_TEMPLATE_YAML: &[u8; 407] = br##"version: v0.1
+    static EXAMPLE_TEMPLATE_YAML: &[u8; 460] = br##"version: v0.1
 args:
-    - name: admin-keys
+    - name: $(cs:ADMIN-KEYS)
       required: false
-      default: $(a:SIGNER_PUB_KEY)
+      default: $(SIGNER_PUB_KEY)
+    - name: $(cs:NODES)
+      required: true
 rules:
     set-management-type:
         management-type: "gameroom"
@@ -84,9 +86,9 @@ rules:
         service-type: 'scabbard'
         service-args:
         - key: 'admin-keys'
-          value: $(admin-keys)
+          value: $(cs:ADMIN-KEYS)
         - key: 'peer-services'
-          value: '$(r:ALL_OTHER_SERVICES)'
+          value: '$(cs:ALL_OTHER_SERVICES)'
         first-service: 'a000' "##;
 
     /*
@@ -99,7 +101,7 @@ rules:
             write_yaml_file(test_yaml_file_path);
             let mut args = HashMap::new();
             args.insert(
-                "NODES".to_string(),
+                "$(cs:NODES)".to_string(),
                 "alpha-node-000,beta-node-000".to_string(),
             );
             let builders = Builders::try_from_template(test_yaml_file_path, &args)
@@ -127,7 +129,7 @@ rules:
             println!("alpha_service_args {:?}", alpha_service_args);
             assert!(alpha_service_args
                 .iter()
-                .any(|(key, value)| key == "admin-keys" && value == "$(admin-keys)"));
+                .any(|(key, value)| key == "admin-keys" && value == "$(cs:ADMIN-KEYS)"));
             assert!(alpha_service_args
                 .iter()
                 .any(|(key, value)| key == "peer-services" && value == "[\"a001\"]"));
@@ -149,7 +151,7 @@ rules:
             println!("beta_service_args {:?}", beta_service_args);
             assert!(beta_service_args
                 .iter()
-                .any(|(key, value)| key == "admin-keys" && value == "$(admin-keys)"));
+                .any(|(key, value)| key == "admin-keys" && value == "$(cs:ADMIN-KEYS)"));
             assert!(beta_service_args
                 .iter()
                 .any(|(key, value)| key == "peer-services" && value == "[\"a000\"]"));

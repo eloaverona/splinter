@@ -17,12 +17,14 @@ use std::collections::HashMap;
 use super::{yaml_parser::v0_1, Error};
 use super::{Builders, CreateCircuitBuilder, SplinterServiceBuilder};
 
-const ALL_OTHER_SERVICES: &str = "$(r:ALL_OTHER_SERVICES)";
+const ALL_OTHER_SERVICES: &str = "$(cs:ALL_OTHER_SERVICES)";
+const NODES_ARG: &str = "$(cs:NODES)";
+
 const PEER_SERVICES_ARG: &str = "peer-services";
 
 pub struct CircuitCreateTemplate {
     _version: String,
-    _args: Vec<RuleArgument>,
+    args: Vec<RuleArgument>,
     rules: Rules,
 }
 
@@ -32,7 +34,7 @@ impl CircuitCreateTemplate {
         builders: &mut Builders,
         arguments: &HashMap<String, String>,
     ) -> Result<(), Error> {
-        self.rules.apply_rules(builders, arguments)
+        self.rules.apply_rules(builders, arguments, &self.args)
     }
 }
 
@@ -40,7 +42,7 @@ impl From<v0_1::YamlCircuitCreateTemplate> for CircuitCreateTemplate {
     fn from(create_circuit_templase: v0_1::YamlCircuitCreateTemplate) -> Self {
         CircuitCreateTemplate {
             _version: create_circuit_templase.version(),
-            _args: create_circuit_templase
+            args: create_circuit_templase
                 .args()
                 .into_iter()
                 .map(RuleArgument::from)
@@ -51,17 +53,17 @@ impl From<v0_1::YamlCircuitCreateTemplate> for CircuitCreateTemplate {
 }
 
 struct RuleArgument {
-    _name: String,
-    _required: bool,
-    _default_value: Option<String>,
+    name: String,
+    required: bool,
+    default_value: Option<String>,
 }
 
 impl From<v0_1::YamlRuleArgument> for RuleArgument {
     fn from(arguments: v0_1::YamlRuleArgument) -> Self {
         RuleArgument {
-            _name: arguments.name(),
-            _required: arguments.required(),
-            _default_value: arguments.default_value(),
+            name: arguments.name(),
+            required: arguments.required(),
+            default_value: arguments.default_value(),
         }
     }
 }
@@ -76,6 +78,7 @@ impl Rules {
         &self,
         builders: &mut Builders,
         arguments: &HashMap<String, String>,
+        template_arguments: &[RuleArgument],
     ) -> Result<(), Error> {
         let mut service_builders = builders.service_builders();
 
@@ -84,7 +87,7 @@ impl Rules {
             .apply_rule(builders.create_circuit_builder())?;
 
         if let Some(create_services) = &self.create_services {
-            service_builders = create_services.apply_rule(arguments)?;
+            service_builders = create_services.apply_rule(arguments, template_arguments)?;
         }
         builders.set_create_circuit_builder(create_service_builder);
         builders.set_service_builders(service_builders);
@@ -129,10 +132,9 @@ impl CreateServices {
     fn apply_rule(
         &self,
         args: &HashMap<String, String>,
+        template_arguments: &[RuleArgument],
     ) -> Result<Vec<SplinterServiceBuilder>, Error> {
-        let nodes = args
-            .get("NODES")
-            .expect("No nodes")
+        let nodes = get_argument_value(NODES_ARG, args, template_arguments)?
             .split(",")
             .map(String::from)
             .collect::<Vec<String>>();
@@ -253,4 +255,42 @@ fn all_services(
         })
         .collect::<Vec<SplinterServiceBuilder>>();
     Ok(services)
+}
+
+fn get_argument_value(
+    key: &str,
+    args: &HashMap<String, String>,
+    template_arguments: &[RuleArgument],
+    //    f: Box<dyn Fn(Vec<SplinterServiceBuilder>) -> Result<Vec<SplinterServiceBuilder>, Error>>,
+) -> Result<String, Error> {
+    let value = match template_arguments.iter().find(|arg| arg.name == key) {
+        Some(arg) => match args.get(key) {
+            Some(val) => val.to_string(),
+            None => {
+                if arg.required {
+                    return Err(Error::new(&format!(
+                        "Argument {} is required but was not provided",
+                        key
+                    )));
+                } else {
+                    arg.default_value
+                        .as_ref()
+                        .ok_or_else(|| {
+                            Error::new(&format!(
+                                "Argument {} was not provided and no default value is set",
+                                key
+                            ))
+                        })?
+                        .clone()
+                }
+            }
+        },
+        None => {
+            return Err(Error::new(
+                &format!("Invalid template. Argument {} was expected but not provided", key)
+            ));
+        }
+    };
+
+    Ok(value)
 }
