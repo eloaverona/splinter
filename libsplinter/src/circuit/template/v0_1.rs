@@ -19,6 +19,7 @@ use super::{Builders, CreateCircuitBuilder, SplinterServiceBuilder};
 
 const ALL_OTHER_SERVICES: &str = "$(cs:ALL_OTHER_SERVICES)";
 const NODES_ARG: &str = "$(cs:NODES)";
+const SIGNER_PUB_KEY: &str = "$(SIGNER_PUB_KEY)";
 
 const PEER_SERVICES_ARG: &str = "peer-services";
 
@@ -135,6 +136,12 @@ impl CreateServices {
         template_arguments: &[RuleArgument],
     ) -> Result<Vec<SplinterServiceBuilder>, Error> {
         let nodes = get_argument_value(NODES_ARG, args, template_arguments)?
+            .ok_or_else(|| {
+                Error::new(&format!(
+                    "Invalid template. Argument {} was expected but not provided",
+                    NODES_ARG
+                ))
+            })?
             .split(",")
             .map(String::from)
             .collect::<Vec<String>>();
@@ -157,7 +164,11 @@ impl CreateServices {
             if arg.key == PEER_SERVICES_ARG && arg.value == ALL_OTHER_SERVICES {
                 service_builders = all_services(service_builders)?;
             } else {
-                new_service_args.push((arg.key.clone(), arg.value.clone()))
+                let value = match get_argument_value(&arg.value, args, template_arguments)? {
+                    Some(val) => val,
+                    None => arg.value.clone(),
+                };
+                new_service_args.push((arg.key.clone(), value))
             }
         }
         println!("service_args {:?}", new_service_args);
@@ -261,11 +272,10 @@ fn get_argument_value(
     key: &str,
     args: &HashMap<String, String>,
     template_arguments: &[RuleArgument],
-    //    f: Box<dyn Fn(Vec<SplinterServiceBuilder>) -> Result<Vec<SplinterServiceBuilder>, Error>>,
-) -> Result<String, Error> {
+) -> Result<Option<String>, Error> {
     let value = match template_arguments.iter().find(|arg| arg.name == key) {
         Some(arg) => match args.get(key) {
-            Some(val) => val.to_string(),
+            Some(val) => Some(val.to_string()),
             None => {
                 if arg.required {
                     return Err(Error::new(&format!(
@@ -273,7 +283,8 @@ fn get_argument_value(
                         key
                     )));
                 } else {
-                    arg.default_value
+                    let default_value = arg
+                        .default_value
                         .as_ref()
                         .ok_or_else(|| {
                             Error::new(&format!(
@@ -281,15 +292,23 @@ fn get_argument_value(
                                 key
                             ))
                         })?
-                        .clone()
+                        .clone();
+                    println!("default_value {}", default_value);
+                    println!("is  SIGNER_PUB_KEY {}", default_value == SIGNER_PUB_KEY);
+
+                    let val = if default_value == SIGNER_PUB_KEY {
+                        match args.get(SIGNER_PUB_KEY) {
+                            Some(val) => val.to_string(),
+                            None => return Err(Error::new("Signer public key was not provided")),
+                        }
+                    } else {
+                        default_value.to_string()
+                    };
+                    Some(val)
                 }
             }
         },
-        None => {
-            return Err(Error::new(
-                &format!("Invalid template. Argument {} was expected but not provided", key)
-            ));
-        }
+        None => None,
     };
 
     Ok(value)

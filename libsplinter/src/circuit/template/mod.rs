@@ -104,6 +104,8 @@ rules:
                 "$(cs:NODES)".to_string(),
                 "alpha-node-000,beta-node-000".to_string(),
             );
+
+            args.insert("$(SIGNER_PUB_KEY)".to_string(), "signer_key".to_string());
             let builders = Builders::try_from_template(test_yaml_file_path, &args)
                 .expect("Error getting builders from templates");
             let circuit_create_builder = builders.create_circuit_builder();
@@ -129,7 +131,7 @@ rules:
             println!("alpha_service_args {:?}", alpha_service_args);
             assert!(alpha_service_args
                 .iter()
-                .any(|(key, value)| key == "admin-keys" && value == "$(cs:ADMIN-KEYS)"));
+                .any(|(key, value)| key == "admin-keys" && value == "signer_key"));
             assert!(alpha_service_args
                 .iter()
                 .any(|(key, value)| key == "peer-services" && value == "[\"a001\"]"));
@@ -151,7 +153,7 @@ rules:
             println!("beta_service_args {:?}", beta_service_args);
             assert!(beta_service_args
                 .iter()
-                .any(|(key, value)| key == "admin-keys" && value == "$(cs:ADMIN-KEYS)"));
+                .any(|(key, value)| key == "admin-keys" && value == "signer_key"));
             assert!(beta_service_args
                 .iter()
                 .any(|(key, value)| key == "peer-services" && value == "[\"a000\"]"));
