@@ -12,11 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::yaml_parser::v1;
-use super::Value;
+use super::super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
+use super::{get_argument_value, is_arg, RuleArgument, Value};
 
 pub(super) struct SetMetadata {
     metadata: Metadata,
+}
+
+impl SetMetadata {
+    pub fn apply_rule(
+        &self,
+        builder: CreateCircuitBuilder,
+        template_arguments: &[RuleArgument],
+    ) -> Result<CreateCircuitBuilder, CircuitTemplateError> {
+        match &self.metadata {
+            Metadata::Json { metadata } => {
+                let mut metadata = metadata
+                    .iter()
+                    .try_fold::<_, _, Result<_, CircuitTemplateError>>(
+                        "{[".to_string(),
+                        |mut acc, metadata| {
+                            match &metadata.value {
+                                Value::Single(value) => {
+                                    let value = if is_arg(&value) {
+                                        get_argument_value(&value, &template_arguments)?
+                                    } else {
+                                        value.to_string()
+                                    };
+                                    acc.push_str(&format!("\"{}\":\"{}\",", metadata.key, value));
+                                }
+                                Value::List(values) => {
+                                    let processed_values = values.iter().try_fold::<_, _, Result<
+                                        _,
+                                        CircuitTemplateError,
+                                    >>(
+                                        Vec::new(),
+                                        |mut acc, value| {
+                                            let value = if is_arg(&value) {
+                                                get_argument_value(&value, &template_arguments)?
+                                            } else {
+                                                value.to_string()
+                                            };
+                                            acc.push(value);
+                                            Ok(acc)
+                                        },
+                                    )?;
+                                    acc.push_str(&format!(
+                                        "\"{}\":{:?},",
+                                        metadata.key, processed_values
+                                    ));
+                                }
+                            }
+
+                            Ok(acc)
+                        },
+                    )?;
+
+                metadata.pop();
+                metadata.push_str("]}");
+
+                Ok(builder.with_application_metadata(&metadata.as_bytes()))
+            }
+        }
+    }
 }
 
 impl From<v1::SetMetadata> for SetMetadata {
